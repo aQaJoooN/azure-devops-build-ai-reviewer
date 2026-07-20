@@ -47,26 +47,16 @@ export class SettingsService {
    * @private
    */
   private async buildHeaders(): Promise<Record<string, string>> {
-    const headers: Record<string, string> = {
+    // NOTE: We intentionally do NOT call SDK.getAccessToken() here.
+    // On on-prem Azure DevOps Server the OAuth session-token endpoint
+    // (/_apis/WebPlatformAuth/SessionToken) returns HTTP 500
+    // (HostAuthorizationNotFound), which floods the console with errors on
+    // every request. The requests already succeed using the current browser
+    // session (cookie auth via credentials: "include"), so we rely on that.
+    return {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
-
-    try {
-      const token = await SDK.getAccessToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    } catch (tokenError) {
-      // Ignore: fall back to cookie-based (ambient) auth. Do NOT let this
-      // trigger an interactive login.
-      console.warn(
-        "getAccessToken() unavailable, using session cookie auth:",
-        tokenError
-      );
-    }
-
-    return headers;
   }
 
   /**

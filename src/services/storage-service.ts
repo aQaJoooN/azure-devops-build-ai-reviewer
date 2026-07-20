@@ -35,24 +35,15 @@ export class StorageService {
    * @private
    */
   private async buildHeaders(): Promise<Record<string, string>> {
-    const headers: Record<string, string> = {
+    // NOTE: We intentionally do NOT call SDK.getAccessToken() here.
+    // On on-prem Azure DevOps Server the OAuth session-token endpoint
+    // returns HTTP 500 (HostAuthorizationNotFound), flooding the console
+    // with errors on every request. Cookie auth (credentials: "include")
+    // already authenticates these calls successfully.
+    return {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
-
-    try {
-      const token = await SDK.getAccessToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    } catch (tokenError) {
-      console.warn(
-        "getAccessToken() unavailable, using session cookie auth:",
-        tokenError
-      );
-    }
-
-    return headers;
   }
 
   /**
