@@ -1,0 +1,41 @@
+{
+  "name": "azure-devops-ai-analyzer",
+  "version": "1.0.0",
+  "description": "AI-powered build log analysis extension for Azure DevOps",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "webpack --mode production",
+    "build:dev": "webpack --mode development",
+    "dev": "webpack --mode development --watch",
+    "package": "tfx extension create --manifest-globs vss-extension.json"
+  },
+  "keywords": [
+    "azure-devops",
+    "extension",
+    "ai",
+    "build-analysis"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "css-loader": "^6.8.0",
+    "html-webpack-plugin": "^5.5.0",
+    "sass": "^1.69.0",
+    "sass-loader": "^13.3.0",
+    "style-loader": "^3.3.0",
+    "tfx-cli": "^0.16.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.0.5",
+    "azure-devops-extension-api": "^4.0.0",
+    "azure-devops-extension-sdk": "^4.0.0",
+    "dompurify": "^3.0.0",
+    "highlight.js": "^11.11.1",
+    "marked": "^11.0.0"
+  }
+}

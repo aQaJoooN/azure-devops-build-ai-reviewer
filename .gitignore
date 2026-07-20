@@ -1,0 +1,6 @@
+.kiro
+node_modules/
+dist/
+*.vsix
+*.log
+.DS_Store

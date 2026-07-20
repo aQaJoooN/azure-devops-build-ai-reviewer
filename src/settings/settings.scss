@@ -1,0 +1,343 @@
+/**
+ * Settings page styles
+ * Consistent with Azure DevOps UI patterns with dark mode support
+ */
+
+// Light theme variables
+$primary-color: #0078d4;
+$primary-hover: #106ebe;
+$text-primary-light: #323130;
+$text-secondary-light: #605e5c;
+$background-light: #ffffff;
+$background-secondary-light: #f3f2f1;
+$border-color-light: #d2d0ce;
+$error-color: #a80000;
+$success-color: #107c10;
+
+// Dark theme variables
+$text-primary-dark: #ffffff;
+$text-secondary-dark: #b3b3b3;
+$background-dark: #1e1e1e;
+$background-secondary-dark: #2d2d2d;
+$border-color-dark: #3d3d3d;
+$input-background-dark: #2d2d2d;
+
+// Reset and base styles
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary-light;
+  margin: 0;
+  padding: 20px;
+  background-color: $background-light;
+
+  // Dark mode
+  &.vss-dark-theme,
+  &[data-theme="dark"] {
+    color: $text-primary-dark;
+    background-color: $background-dark;
+
+    .settings-header {
+      border-bottom-color: $border-color-dark;
+
+      h2 {
+        color: $text-primary-dark;
+      }
+
+      .settings-description {
+        color: $text-secondary-dark;
+      }
+    }
+
+    .settings-form {
+      .form-group {
+        .field-label {
+          color: $text-primary-dark;
+
+          .optional {
+            color: $text-secondary-dark;
+          }
+        }
+
+        .form-input {
+          color: $text-primary-dark;
+          background-color: $input-background-dark;
+          border-color: $border-color-dark;
+
+          &:focus {
+            border-color: $primary-color;
+            box-shadow: 0 0 0 1px $primary-color;
+          }
+
+          &::placeholder {
+            color: #666666;
+          }
+        }
+
+        .field-description {
+          color: $text-secondary-dark;
+        }
+      }
+
+      .toggle-label {
+        .toggle-input {
+          background-color: $border-color-dark;
+
+          &::after {
+            background-color: #e0e0e0;
+          }
+        }
+
+        .toggle-text {
+          color: $text-primary-dark;
+        }
+      }
+
+      .configuration-section {
+        border-left-color: $background-secondary-dark;
+      }
+
+      .form-actions {
+        border-top-color: $border-color-dark;
+
+        .primary-button {
+          &:disabled {
+            background-color: $background-secondary-dark;
+            color: $text-secondary-dark;
+          }
+        }
+      }
+    }
+  }
+}
+
+.settings-container {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  margin-bottom: 32px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid $border-color-light;
+
+  h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: $text-primary-light;
+  }
+
+  .settings-description {
+    font-size: 14px;
+    color: $text-secondary-light;
+    margin: 0;
+  }
+}
+
+.settings-form {
+  .form-group {
+    margin-bottom: 24px;
+
+    .field-label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: $text-primary-light;
+      font-size: 14px;
+
+      .required {
+        color: $error-color;
+        margin-left: 2px;
+      }
+
+      .optional {
+        font-weight: 400;
+        color: $text-secondary-light;
+        font-style: italic;
+      }
+    }
+
+    .form-input {
+      width: 100%;
+      max-width: 500px;
+      padding: 8px 12px;
+      font-size: 14px;
+      line-height: 1.5;
+      color: $text-primary-light;
+      background-color: #ffffff;
+      border: 1px solid $border-color-light;
+      border-radius: 2px;
+      box-sizing: border-box;
+      transition: border-color 0.15s ease-in-out;
+
+      &:focus {
+        outline: none;
+        border-color: $primary-color;
+        box-shadow: 0 0 0 1px $primary-color;
+      }
+
+      &::placeholder {
+        color: #a19f9d;
+      }
+    }
+
+    .field-description {
+      font-size: 12px;
+      color: $text-secondary-light;
+      margin: 6px 0 0 0;
+      line-height: 1.4;
+    }
+
+    .error-message {
+      display: block;
+      color: $error-color;
+      font-size: 12px;
+      margin-top: 6px;
+      font-weight: 500;
+    }
+  }
+
+  // Toggle switch styles
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+
+    .toggle-input {
+      width: 44px;
+      height: 20px;
+      position: relative;
+      appearance: none;
+      background-color: $border-color-light;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      flex-shrink: 0;
+
+      &:checked {
+        background-color: $primary-color;
+
+        &::after {
+          transform: translateX(24px);
+        }
+      }
+
+      &::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 16px;
+        height: 16px;
+        background-color: #ffffff;
+        border-radius: 50%;
+        transition: transform 0.2s ease;
+      }
+
+      &:focus {
+        outline: 1px solid $primary-color;
+        outline-offset: 2px;
+      }
+    }
+
+    .toggle-text {
+      margin-left: 12px;
+      font-weight: 600;
+      color: $text-primary-light;
+    }
+  }
+
+  // Configuration section (can be hidden)
+  .configuration-section {
+    padding-left: 20px;
+    border-left: 3px solid $background-secondary-light;
+    margin-top: 16px;
+    transition: opacity 0.2s ease;
+  }
+
+  // Action buttons
+  .form-actions {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid $border-color-light;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .primary-button {
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      background-color: $primary-color;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+
+      &:hover:not(:disabled) {
+        background-color: $primary-hover;
+      }
+
+      &:focus {
+        outline: 1px solid $primary-color;
+        outline-offset: 2px;
+      }
+
+      &:disabled {
+        background-color: $background-secondary-light;
+        color: $text-secondary-light;
+        cursor: not-allowed;
+      }
+    }
+
+    .status-message {
+      font-size: 14px;
+      font-weight: 500;
+
+      &.success {
+        color: $success-color;
+      }
+
+      &.error {
+        color: $error-color;
+      }
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  body {
+    padding: 16px;
+  }
+
+  .settings-container {
+    max-width: 100%;
+  }
+
+  .settings-form {
+    .form-group {
+      .form-input {
+        max-width: 100%;
+      }
+    }
+
+    .configuration-section {
+      padding-left: 12px;
+      border-left-width: 2px;
+    }
+
+    .form-actions {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .primary-button {
+        width: 100%;
+      }
+    }
+  }
+}

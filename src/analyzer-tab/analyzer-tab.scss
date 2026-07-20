@@ -1,0 +1,633 @@
+/**
+ * AI Analyzer Tab styles
+ * Consistent with Azure DevOps UI patterns with dark mode support
+ */
+
+// Light theme variables
+$primary-color: #0078d4;
+$primary-hover: #106ebe;
+$secondary-color: #8661c5;
+$secondary-hover: #744da9;
+$text-primary-light: #323130;
+$text-secondary-light: #605e5c;
+$background-light: #ffffff;
+$background-secondary-light: #f3f2f1;
+$border-color-light: #d2d0ce;
+$error-color: #a80000;
+$success-color: #107c10;
+$warning-color: #f7630c;
+
+// Dark theme variables
+$text-primary-dark: #ffffff;
+$text-secondary-dark: #b3b3b3;
+$background-dark: #1e1e1e;
+$background-secondary-dark: #2d2d2d;
+$border-color-dark: #3d3d3d;
+$code-background-dark: #2d2d2d;
+
+// Reset and base styles
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary-light;
+  margin: 0;
+  padding: 20px;
+  background-color: $background-light;
+
+  // Dark mode
+  &.vss-dark-theme,
+  &[data-theme="dark"] {
+    color: $text-primary-dark;
+    background-color: $background-dark;
+
+    .controls-section {
+      background-color: $background-secondary-dark;
+      border-color: $border-color-dark;
+
+      .controls-header {
+        h3 {
+          color: $text-primary-dark;
+        }
+
+        .controls-description {
+          color: $text-secondary-dark;
+        }
+      }
+
+      .button-descriptions {
+        border-top-color: $border-color-dark;
+
+        .button-help {
+          color: $text-secondary-dark;
+
+          strong {
+            color: $text-primary-dark;
+          }
+        }
+      }
+    }
+
+    .loading-section {
+      .spinner-container {
+        .spinner {
+          border-color: $border-color-dark;
+          border-top-color: $primary-color;
+        }
+
+        .loading-text {
+          color: $text-primary-dark;
+        }
+
+        .loading-subtext {
+          color: $text-secondary-dark;
+        }
+      }
+    }
+
+    .error-section {
+      .error-container {
+        .error-title {
+          color: $text-primary-dark;
+        }
+
+        .error-message {
+          color: $text-secondary-dark;
+        }
+      }
+    }
+
+    .results-section {
+      .results-header {
+        border-bottom-color: $border-color-dark;
+
+        h3 {
+          color: $text-primary-dark;
+        }
+
+        .results-meta {
+          .analysis-timestamp {
+            color: $text-secondary-dark;
+          }
+        }
+      }
+
+      .markdown-content {
+        background-color: $background-secondary-dark;
+        border-color: $border-color-dark;
+
+        h1, h2, h3, h4, h5, h6 {
+          color: $text-primary-dark;
+          border-bottom-color: $border-color-dark;
+        }
+
+        p, li {
+          color: $text-primary-dark;
+        }
+
+        code {
+          background-color: $code-background-dark;
+          border-color: $border-color-dark;
+          color: #ff6b6b;
+        }
+
+        pre {
+          background-color: $code-background-dark;
+          border-color: $border-color-dark;
+
+          code {
+            color: $text-primary-dark;
+          }
+        }
+
+        blockquote {
+          border-left-color: $border-color-dark;
+          background-color: $code-background-dark;
+          color: $text-secondary-dark;
+        }
+
+        table {
+          border-color: $border-color-dark;
+
+          th, td {
+            border-color: $border-color-dark;
+          }
+
+          th {
+            background-color: $code-background-dark;
+            color: $text-primary-dark;
+          }
+
+          td {
+            color: $text-primary-dark;
+          }
+        }
+
+        hr {
+          border-top-color: $border-color-dark;
+        }
+
+        .hljs {
+          background-color: $code-background-dark;
+          color: $text-primary-dark;
+        }
+      }
+    }
+  }
+}
+
+.analyzer-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+// Controls Section
+.controls-section {
+  padding: 24px;
+  background-color: $background-secondary-light;
+  border-radius: 4px;
+  margin-bottom: 24px;
+
+  .controls-header {
+    margin-bottom: 20px;
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+      color: $text-primary-light;
+    }
+
+    .controls-description {
+      font-size: 14px;
+      color: $text-secondary-light;
+      margin: 0;
+    }
+  }
+
+  .button-group {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .primary-button,
+  .secondary-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    
+    .button-icon {
+      font-size: 16px;
+    }
+
+    &:focus {
+      outline: 2px solid $primary-color;
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+
+  .primary-button {
+    color: #ffffff;
+    background-color: $primary-color;
+
+    &:hover:not(:disabled) {
+      background-color: $primary-hover;
+    }
+  }
+
+  .secondary-button {
+    color: #ffffff;
+    background-color: $secondary-color;
+
+    &:hover:not(:disabled) {
+      background-color: $secondary-hover;
+    }
+  }
+
+  .button-descriptions {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid $border-color-light;
+
+    .button-help {
+      font-size: 13px;
+      color: $text-secondary-light;
+      margin: 6px 0;
+      line-height: 1.4;
+
+      strong {
+        color: $text-primary-light;
+      }
+    }
+  }
+}
+
+// Loading Section
+.loading-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 80px 20px;
+  text-align: center;
+
+  .spinner-container {
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid $background-secondary-light;
+      border-top: 4px solid $primary-color;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px auto;
+    }
+
+    .loading-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: $text-primary-light;
+      margin: 0 0 8px 0;
+    }
+
+    .loading-subtext {
+      font-size: 14px;
+      color: $text-secondary-light;
+      margin: 0;
+    }
+  }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+// Error Section
+.error-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+
+  .error-container {
+    text-align: center;
+    max-width: 500px;
+
+    .error-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .error-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: $text-primary-light;
+      margin: 0 0 12px 0;
+    }
+
+    .error-message {
+      font-size: 14px;
+      color: $text-secondary-light;
+      margin: 0 0 24px 0;
+      line-height: 1.5;
+    }
+
+    .retry-button {
+      padding: 8px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #ffffff;
+      background-color: $primary-color;
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+
+      &:hover {
+        background-color: $primary-hover;
+      }
+
+      &:focus {
+        outline: 2px solid $primary-color;
+        outline-offset: 2px;
+      }
+    }
+  }
+}
+
+// Results Section
+.results-section {
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid $border-color-light;
+    flex-wrap: wrap;
+    gap: 12px;
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0;
+      color: $text-primary-light;
+    }
+
+    .results-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .analysis-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+
+        &.analyze,
+        &.standard {
+          background-color: #e1f5fe;
+          color: #01579b;
+        }
+
+        &.super-analyze,
+        &.super {
+          background-color: #f3e5f5;
+          color: #4a148c;
+        }
+      }
+
+      .analysis-timestamp {
+        font-size: 13px;
+        color: $text-secondary-light;
+      }
+    }
+  }
+
+  .markdown-content {
+    padding: 24px;
+    background-color: $background-light;
+    border: 1px solid $border-color-light;
+    border-radius: 4px;
+    line-height: 1.6;
+
+    // Markdown styling
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 24px;
+      margin-bottom: 16px;
+      font-weight: 600;
+      line-height: 1.25;
+      color: $text-primary-light;
+
+      &:first-child {
+        margin-top: 0;
+      }
+    }
+
+    h1 {
+      font-size: 28px;
+      border-bottom: 1px solid $border-color-light;
+      padding-bottom: 8px;
+    }
+
+    h2 {
+      font-size: 24px;
+      border-bottom: 1px solid $border-color-light;
+      padding-bottom: 6px;
+    }
+
+    h3 {
+      font-size: 20px;
+    }
+
+    h4 {
+      font-size: 16px;
+    }
+
+    h5, h6 {
+      font-size: 14px;
+    }
+
+    p {
+      margin: 0 0 16px 0;
+      color: $text-primary-light;
+    }
+
+    ul, ol {
+      margin: 0 0 16px 0;
+      padding-left: 24px;
+
+      li {
+        margin-bottom: 8px;
+        color: $text-primary-light;
+      }
+    }
+
+    code {
+      padding: 2px 6px;
+      font-family: "Consolas", "Monaco", "Courier New", monospace;
+      font-size: 13px;
+      background-color: $background-secondary-light;
+      border: 1px solid $border-color-light;
+      border-radius: 3px;
+      color: #e01e5a;
+    }
+
+    pre {
+      margin: 0 0 16px 0;
+      padding: 16px;
+      background-color: #f6f8fa;
+      border: 1px solid $border-color-light;
+      border-radius: 4px;
+      overflow-x: auto;
+
+      code {
+        padding: 0;
+        background-color: transparent;
+        border: none;
+        color: $text-primary-light;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+    }
+
+    blockquote {
+      margin: 0 0 16px 0;
+      padding: 8px 16px;
+      border-left: 4px solid $border-color-light;
+      background-color: $background-secondary-light;
+      color: $text-secondary-light;
+
+      p:last-child {
+        margin-bottom: 0;
+      }
+    }
+
+    table {
+      width: 100%;
+      margin: 0 0 16px 0;
+      border-collapse: collapse;
+      border: 1px solid $border-color-light;
+
+      th, td {
+        padding: 8px 12px;
+        border: 1px solid $border-color-light;
+        text-align: left;
+      }
+
+      th {
+        background-color: $background-secondary-light;
+        font-weight: 600;
+        color: $text-primary-light;
+      }
+
+      td {
+        color: $text-primary-light;
+      }
+    }
+
+    a {
+      color: $primary-color;
+      text-decoration: none;
+
+      &:hover {
+        text-decoration: underline;
+      }
+    }
+
+    hr {
+      margin: 24px 0;
+      border: none;
+      border-top: 1px solid $border-color-light;
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 4px;
+    }
+
+    // Syntax highlighting support
+    .hljs {
+      background-color: #f6f8fa;
+      color: $text-primary-light;
+    }
+  }
+}
+
+// Responsive design
+@media (max-width: 768px) {
+  body {
+    padding: 12px;
+  }
+
+  .analyzer-container {
+    max-width: 100%;
+  }
+
+  .controls-section {
+    padding: 16px;
+
+    .button-group {
+      flex-direction: column;
+
+      .primary-button,
+      .secondary-button {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+  }
+
+  .results-section {
+    .results-header {
+      flex-direction: column;
+      align-items: flex-start;
+
+      .results-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
+    }
+
+    .markdown-content {
+      padding: 16px;
+      font-size: 13px;
+
+      h1 {
+        font-size: 24px;
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      h3 {
+        font-size: 18px;
+      }
+
+      pre {
+        padding: 12px;
+        font-size: 12px;
+      }
+    }
+  }
+}

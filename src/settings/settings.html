@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Analyzer Settings</title>
+</head>
+<body>
+    <div class="settings-container">
+        <div class="settings-header">
+            <h2>AI Analyzer Settings</h2>
+            <p class="settings-description">
+                Configure AI-powered build log analysis for this project.
+            </p>
+        </div>
+
+        <div class="settings-form">
+            <!-- Extension Enable/Disable Toggle -->
+            <div class="form-group">
+                <label class="toggle-label">
+                    <input type="checkbox" id="enableExtension" class="toggle-input" />
+                    <span class="toggle-text">AI Analyzer Extension</span>
+                </label>
+                <p class="field-description">
+                    When enabled, the AI Analyzer tab will appear in build results and allow AI-powered analysis.
+                </p>
+            </div>
+
+            <!-- Configuration Options (shown only when extension is enabled) -->
+            <div id="configurationOptions" class="configuration-section">
+                <div class="form-group">
+                    <label for="aiBackendUrl" class="field-label">
+                        AI Backend URL <span class="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="aiBackendUrl" 
+                        class="form-input" 
+                        placeholder="https://your-ai-backend.example.com"
+                        aria-required="true"
+                    />
+                    <p class="field-description">
+                        URL of the AI service that will process analysis requests.
+                    </p>
+                    <span id="urlError" class="error-message"></span>
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKey" class="field-label">
+                        API Key <span class="optional">(optional)</span>
+                    </label>
+                    <input 
+                        type="password" 
+                        id="apiKey" 
+                        class="form-input" 
+                        placeholder="Enter API key if required"
+                    />
+                    <p class="field-description">
+                        authentication key for the AI backend service.
+                    </p>
+                </div>
+
+                <div class="form-group">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="enableSuperAnalyze" class="toggle-input" />
+                        <span class="toggle-text">Super Analyze</span>
+                    </label>
+                    <p class="field-description">
+                        When enabled, users can perform comprehensive analysis including full logs and repository context.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-actions">
+                <button id="saveButton" class="primary-button" type="button">
+                    Save Settings
+                </button>
+                <span id="saveStatus" class="status-message"></span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
