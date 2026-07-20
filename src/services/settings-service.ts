@@ -1,141 +1,170 @@
 import * as SDK from "azure-devops-extension-sdk";
-import { CommonServiceIds } from "azure-devops-extension-api";
 import { ExtensionSettings } from "../models/settings";
 
 /**
- * Service for managing extension settings storage and retrieval  
- * Uses Azure DevOps Extension Data Service
+ * Service for managing extension settings storage and retrieval.
+ *
+ * On on-prem Azure DevOps Server the OAuth session-token endpoint
+ * (/_apis/WebPlatformAuth/SessionToken) can fail with
+ * "HostAuthorizationNotFound", and the SDK Extension Data Service then
+ * triggers an interactive login popup. To avoid this, settings are stored
+ * directly through the ExtensionManagement document REST API using the
+ * current browser session (cookie auth via credentials: "include").
  */
 export class SettingsService {
-  private static readonly SETTINGS_KEY = "ai-analyzer-extension-settings";
-  private static readonly TIMEOUT_MS = 5000;
-  private dataManagerPromise: Promise<any> | null = null;
+  private static readonly DOCUMENT_ID = "ai-analyzer-extension-settings";
+  private static readonly COLLECTION_NAME = "$settings";
+  private static readonly API_VERSION = "3.2-preview.1";
+
+  private static readonly DEFAULT_SETTINGS: ExtensionSettings = {
+    enabled: false,
+    aiBackendUrl: "",
+    apiKey: undefined,
+    superAnalyzeEnabled: false,
+  };
 
   /**
-   * Get or create cached data manager
+   * Build the base URL for the extension data documents endpoint.
+   * Uses the current window origin and TFS collection name so it works
+   * on on-prem Azure DevOps Server.
    * @private
    */
-  private async getDataManager(): Promise<any> {
-    if (!this.dataManagerPromise) {
-      this.dataManagerPromise = this.createDataManager();
-    }
-    return this.dataManagerPromise;
-  }
-
-  /**
-   * Create data manager with timeout protection
-   * @private
-   */
-  private async createDataManager(): Promise<any> {
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Data manager initialization timed out')), SettingsService.TIMEOUT_MS);
-    });
-
+  private async getDocumentsBaseUrl(): Promise<string> {
     await SDK.ready();
-    const accessToken = await SDK.getAccessToken();
-    const extContext = SDK.getExtensionContext();
-    
-    const dataService = await SDK.getService<any>(CommonServiceIds.ExtensionDataService);
-    
-    const dataManager = await Promise.race([
-      dataService.getExtensionDataManager(
-        extContext.publisherId + "." + extContext.extensionId,
-        accessToken
-      ),
-      timeoutPromise
-    ]);
-
-    return dataManager;
+    const ctx = SDK.getExtensionContext();
+    const host = SDK.getHost();
+    const origin = `${window.location.protocol}//${window.location.host}`;
+    return (
+      `${origin}/tfs/${host.name}/_apis/ExtensionManagement/InstalledExtensions/` +
+      `${ctx.publisherId}/${ctx.extensionId}/Data/Scopes/Default/Current/` +
+      `Collections/${SettingsService.COLLECTION_NAME}/Documents`
+    );
   }
 
   /**
-   * Get extension settings for a specific project
-   * @param projectId - The Azure DevOps project ID
-   * @returns Promise resolving to ExtensionSettings or default settings if not found
+   * Build request headers. Includes a Bearer token only when one can be
+   * obtained without failing; otherwise relies purely on the session cookie.
+   * @private
    */
-  async getSettings(projectId: string): Promise<ExtensionSettings> {
+  private async buildHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+
+    try {
+      const token = await SDK.getAccessToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    } catch (tokenError) {
+      // Ignore: fall back to cookie-based (ambient) auth. Do NOT let this
+      // trigger an interactive login.
+      console.warn(
+        "getAccessToken() unavailable, using session cookie auth:",
+        tokenError
+      );
+    }
+
+    return headers;
+  }
+
+  /**
+   * Get extension settings for a specific project.
+   * @param projectId - The Azure DevOps project ID (kept for API compatibility)
+   * @returns Promise resolving to ExtensionSettings or defaults if not found
+   */
+  async getSettings(_projectId: string): Promise<ExtensionSettings> {
     try {
       console.log("=== Getting Settings ===");
-      console.log("Project ID:", projectId);
-      
-      const dataManager = await this.getDataManager();
-      console.log("Data manager obtained (cached)");
-      
-      const settings = await dataManager.getValue(
-        SettingsService.SETTINGS_KEY
-      ) as ExtensionSettings | undefined;
+      const baseUrl = await this.getDocumentsBaseUrl();
+      const url = `${baseUrl}/${SettingsService.DOCUMENT_ID}?api-version=${SettingsService.API_VERSION}`;
+      const headers = await this.buildHeaders();
 
-      console.log("Settings retrieved:", settings);
+      const response = await fetch(url, {
+        method: "GET",
+        headers,
+        credentials: "include",
+      });
 
-      // Return settings if found, otherwise return default settings
-      if (settings) {
-        return settings;
+      if (response.status === 404) {
+        console.log("No settings document found, returning defaults");
+        return { ...SettingsService.DEFAULT_SETTINGS };
       }
 
-      // Default settings when not configured
-      console.log("No settings found, returning defaults");
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const doc = await response.json();
+      console.log("Settings document retrieved");
+
       return {
-        enabled: false,
-        aiBackendUrl: "",
-        apiKey: undefined,
-        superAnalyzeEnabled: false,
+        enabled: !!doc.enabled,
+        aiBackendUrl: doc.aiBackendUrl || "",
+        apiKey: doc.apiKey || undefined,
+        superAnalyzeEnabled: !!doc.superAnalyzeEnabled,
       };
     } catch (error) {
       console.error("=== Error Retrieving Settings ===");
       console.error("Error:", error);
-      // Return default settings on error
-      return {
-        enabled: false,
-        aiBackendUrl: "",
-        apiKey: undefined,
-        superAnalyzeEnabled: false,
-      };
+      // Return defaults on error so the page still loads without a popup
+      return { ...SettingsService.DEFAULT_SETTINGS };
     }
   }
 
   /**
-   * Save extension settings for a specific project
-   * @param projectId - The Azure DevOps project ID
+   * Save extension settings for a specific project.
+   * @param projectId - The Azure DevOps project ID (kept for API compatibility)
    * @param settings - The settings to save
-   * @returns Promise that resolves when settings are saved
    */
   async saveSettings(
-    projectId: string,
+    _projectId: string,
     settings: ExtensionSettings
   ): Promise<void> {
     try {
       console.log("=== Saving Settings ===");
-      console.log("Project ID:", projectId);
-      console.log("Settings:", JSON.stringify(settings, null, 2));
-      
-      const dataManager = await this.getDataManager();
-      console.log("Data manager obtained (cached)");
-      
-      await dataManager.setValue(
-        SettingsService.SETTINGS_KEY,
-        settings
-      );
-      
+      const baseUrl = await this.getDocumentsBaseUrl();
+      const url = `${baseUrl}?api-version=${SettingsService.API_VERSION}`;
+      const headers = await this.buildHeaders();
+
+      // __etag: -1 performs an upsert (create or overwrite) without a
+      // concurrency check.
+      const document = {
+        id: SettingsService.DOCUMENT_ID,
+        __etag: -1,
+        enabled: settings.enabled,
+        aiBackendUrl: settings.aiBackendUrl,
+        apiKey: settings.apiKey || null,
+        superAnalyzeEnabled: settings.superAnalyzeEnabled,
+      };
+
+      const response = await fetch(url, {
+        method: "PUT",
+        headers,
+        credentials: "include",
+        body: JSON.stringify(document),
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
+      }
+
       console.log("Settings saved successfully");
     } catch (error) {
       console.error("=== Error Saving Settings ===");
-      console.error("Error type:", typeof error);
       console.error("Error:", error);
-      
-      if (error instanceof Error) {
-        console.error("Error message:", error.message);
-        console.error("Stack trace:", error.stack);
-        throw new Error(`Failed to save extension settings: ${error.message}`);
-      } else {
-        throw new Error(`Failed to save extension settings: ${JSON.stringify(error)}`);
-      }
+      const message =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      throw new Error(`Failed to save extension settings: ${message}`);
     }
   }
 
   /**
-   * Check if the extension is enabled for a specific project
+   * Check if the extension is enabled for a specific project.
    * @param projectId - The Azure DevOps project ID
-   * @returns Promise resolving to true if extension is enabled, false otherwise
+   * @returns Promise resolving to true if extension is enabled
    */
   async isExtensionEnabled(projectId: string): Promise<boolean> {
     try {
