@@ -61,10 +61,6 @@ export class BuildService {
       const projectId = await this.getProjectId();
       console.log("Project ID:", projectId);
 
-      // Get access token for authentication
-      const accessToken = await SDK.getAccessToken();
-      console.log("Access token obtained");
-
       // Get host URL - using window.location as fallback
       const host = SDK.getHost();
       const baseUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
@@ -77,8 +73,8 @@ export class BuildService {
       // Fetch log references using direct HTTP
       console.log("Fetching build log references...");
       const response = await fetch(apiUrl, {
+        credentials: "include",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
       });
@@ -104,8 +100,8 @@ export class BuildService {
             const logUrl = `${baseUrl}/tfs/${host.name}/${projectId}/_apis/build/builds/${buildId}/logs/${log.id}?api-version=5.0`;
             
             const logResponse = await fetch(logUrl, {
+              credentials: "include",
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
                 'Accept': 'text/plain'
               }
             });
@@ -185,10 +181,6 @@ export class BuildService {
       const projectId = await this.getProjectId();
       console.log("Project ID obtained:", projectId);
 
-      // Get access token for authentication
-      const accessToken = await SDK.getAccessToken();
-      console.log("Access token obtained");
-
       // Get host URL - using window.location as fallback
       const host = SDK.getHost();
       const baseUrl = `${window.location.protocol}//${window.location.hostname}${window.location.port ? ':' + window.location.port : ''}`;
@@ -198,11 +190,12 @@ export class BuildService {
       const apiUrl = `${baseUrl}/tfs/${host.name}/${projectId}/_apis/build/builds/${buildId}?api-version=5.0`;
       console.log("API URL:", apiUrl);
 
-      // Fetch build details using direct HTTP
+      // Fetch build details using direct HTTP with cookie-based session auth
+      // (no SDK.getAccessToken(), which 500s on on-prem servers).
       console.log("Fetching build details...");
       const response = await fetch(apiUrl, {
+        credentials: "include",
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json'
         }
       });
