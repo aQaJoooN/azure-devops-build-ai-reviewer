@@ -1,5 +1,7 @@
 import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IProjectPageService } from "azure-devops-extension-api";
+
+declare const __APP_VERSION__: string;
 import { SettingsService } from "../services/settings-service";
 import { StorageService } from "../services/storage-service";
 import { BuildService } from "../services/build-service";
@@ -51,7 +53,7 @@ class AnalyzerTabController {
    */
   async initialize(): Promise<void> {
     try {
-      console.log("=== Initializing AI Analyzer Tab ===");
+      console.log(`=== Initializing AI Analyzer Tab (runtime ${__APP_VERSION__}) ===`);
       this.initializeUIElements();
 
       // Complete the host load handshake before project, settings, or storage

@@ -1,5 +1,7 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const { version } = require('./package.json');
 
 module.exports = (env, argv) => {
   const mode = argv.mode || 'development';
@@ -17,7 +19,7 @@ module.exports = (env, argv) => {
     
     // Output bundle structure
     output: {
-      filename: '[name].js',
+      filename: '[name].[contenthash:8].js',
       path: path.resolve(__dirname, 'dist'),
       clean: true, // Clean dist folder before each build
       publicPath: ''
@@ -76,6 +78,9 @@ module.exports = (env, argv) => {
     
     // HTML processing plugins
     plugins: [
+      new webpack.DefinePlugin({
+        __APP_VERSION__: JSON.stringify(version)
+      }),
       // Settings page HTML
       new HtmlWebpackPlugin({
         template: './src/settings/settings.html',

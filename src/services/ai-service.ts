@@ -1,4 +1,7 @@
 import * as SDK from "azure-devops-extension-sdk";
+
+declare const __APP_VERSION__: string;
+
 import {
   AIResponse,
   AnalyzeRequest,
@@ -230,7 +233,7 @@ export class AIService {
       ) {
         throw this.createProxyError(
           response.status,
-          `Azure DevOps denied endpoint-proxy POST (runtime ${AIService.RUNTIME_VERSION}). Install or approve an extension version granted the vso.serviceendpoint_manage scope. User service-connection permissions do not replace this extension grant.`
+          `Azure DevOps denied endpoint-proxy POST (runtime ${__APP_VERSION__}). Install or approve an extension version granted the vso.serviceendpoint_manage scope. User service-connection permissions do not replace this extension grant.`
         );
       }
       throw this.createProxyError(

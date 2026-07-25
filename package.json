@@ -7,7 +7,7 @@
     "build": "webpack --mode production",
     "build:dev": "webpack --mode development",
     "dev": "webpack --mode development --watch",
-    "package": "tfx extension create --manifest-globs vss-extension.json"
+    "package": "tfx extension create --manifest-js vss-extension.js"
   },
   "keywords": [
     "azure-devops",

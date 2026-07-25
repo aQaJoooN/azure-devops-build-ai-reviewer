@@ -2,7 +2,6 @@
   "manifestVersion": 1,
   "id": "ai-analyzer",
   "name": "AI Analyzer for Build Logs",
-  "version": "1.0.0",
   "publisher": "aQaJoooN",
   "public": true,
   "description": "AI-powered build log analysis extension for Azure DevOps. Analyze build failures with AI assistance.",
