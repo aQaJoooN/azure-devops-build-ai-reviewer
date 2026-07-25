@@ -9,14 +9,10 @@ export interface ExtensionSettings {
   enabled: boolean;
 
   /**
-   * URL of the AI backend service (Python service or AI API)
+   * Name of the Azure DevOps Generic service connection whose Server URL
+   * points to the OpenAI-compatible chat-completions endpoint.
    */
-  aiBackendUrl: string;
-
-  /**
-   * Optional API key for authenticating with the AI backend
-   */
-  apiKey?: string;
+  serviceConnectionName: string;
 
   /**
    * Whether the super analyze feature is enabled

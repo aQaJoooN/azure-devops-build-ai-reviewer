@@ -18,8 +18,7 @@ export class SettingsService {
 
   private static readonly DEFAULT_SETTINGS: ExtensionSettings = {
     enabled: false,
-    aiBackendUrl: "",
-    apiKey: undefined,
+    serviceConnectionName: "",
     superAnalyzeEnabled: false,
   };
 
@@ -91,8 +90,7 @@ export class SettingsService {
 
       return {
         enabled: !!doc.enabled,
-        aiBackendUrl: doc.aiBackendUrl || "",
-        apiKey: doc.apiKey || undefined,
+        serviceConnectionName: doc.serviceConnectionName || "",
         superAnalyzeEnabled: !!doc.superAnalyzeEnabled,
       };
     } catch (error) {
@@ -124,8 +122,7 @@ export class SettingsService {
         id: SettingsService.DOCUMENT_ID,
         __etag: -1,
         enabled: settings.enabled,
-        aiBackendUrl: settings.aiBackendUrl,
-        apiKey: settings.apiKey || null,
+        serviceConnectionName: settings.serviceConnectionName,
         superAnalyzeEnabled: settings.superAnalyzeEnabled,
       };
 

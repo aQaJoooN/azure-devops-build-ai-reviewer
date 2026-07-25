@@ -1,324 +1,322 @@
+import * as SDK from "azure-devops-extension-sdk";
 import {
-  AnalyzeRequest,
-  SuperAnalyzeRequest,
   AIResponse,
+  AnalyzeRequest,
   RepositoryContext,
+  SuperAnalyzeRequest,
 } from "../models/analysis";
 
+interface ServiceEndpointSummary {
+  id: string;
+  name: string;
+  type: string;
+  url: string;
+  authorization?: {
+    parameters: Record<string, string>;
+    scheme: string;
+  };
+  data?: Record<string, string>;
+}
+
+interface EndpointListResponse {
+  value?: ServiceEndpointSummary[];
+}
+
+interface EndpointProxyResult {
+  errorMessage?: string;
+  result?: unknown;
+  statusCode?: string | number;
+}
+
 /**
- * Service for communicating with external AI backend
- * Handles HTTP requests to AI service for log analysis
+ * Sends OpenAI-compatible requests through an Azure DevOps Generic service
+ * connection. Azure DevOps performs the backend HTTP request server-side,
+ * avoiding browser mixed-content and CORS restrictions.
  */
 export class AIService {
-  private readonly DEFAULT_TIMEOUT = 60000; // 60 seconds
   private readonly MAX_RETRIES = 2;
-  private readonly RETRY_DELAY = 1000; // 1 second
+  private readonly RETRY_DELAY = 1000;
 
-  /**
-   * Perform standard analysis on build logs
-   * Sends error logs (or full logs if build succeeded) to AI backend in OpenAI format
-   * @param backendUrl - Complete URL of the AI backend service (used as-is)
-   * @param logs - Build logs to analyze
-   * @param apiKey - Optional API key for authentication
-   * @returns Promise resolving to markdown-formatted analysis
-   */
   async analyze(
-    backendUrl: string,
-    logs: string,
-    apiKey?: string
+    projectId: string,
+    serviceConnectionName: string,
+    logs: string
   ): Promise<string> {
     const request: AnalyzeRequest = {
       messages: [
         {
-          role: 'system',
-          content: 'You are an expert at analyzing Azure DevOps build logs. Provide concise, actionable analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide details.'
+          role: "system",
+          content:
+            "You are an expert at analyzing Azure DevOps build logs. Provide concise, actionable analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide details.",
         },
         {
-          role: 'user',
-          content: `Analyze these Azure DevOps build logs and identify issues:\n\n${logs}`
-        }
-      ]
+          role: "user",
+          content: `Analyze these Azure DevOps build logs and identify issues:\n\n${logs}`,
+        },
+      ],
     };
 
-    // Use backendUrl as-is without appending paths
-    const response = await this.sendRequest<AnalyzeRequest, AIResponse>(
-      backendUrl,
-      request,
-      apiKey
-    );
-
-    return response.choices[0].message.content;
+    return this.sendOpenAIRequest(projectId, serviceConnectionName, request);
   }
 
-  /**
-   * Perform comprehensive analysis with full logs and repository context
-   * Sends data to AI backend in OpenAI format
-   * @param backendUrl - Complete URL of the AI backend service (used as-is)
-   * @param logs - Full build logs
-   * @param repositories - Repository context including source files
-   * @param apiKey - Optional API key for authentication
-   * @returns Promise resolving to markdown-formatted analysis
-   */
   async superAnalyze(
-    backendUrl: string,
+    projectId: string,
+    serviceConnectionName: string,
     logs: string,
-    repositories: RepositoryContext[],
-    apiKey?: string
+    repositories: RepositoryContext[]
   ): Promise<string> {
-    // Build repository context string
-    let repoContext = '';
-    for (const repo of repositories) {
-      repoContext += `\n\nRepository: ${repo.repositoryName}\nBranch: ${repo.branch}\nCommit: ${repo.commit}\n`;
-      repoContext += `Files:\n`;
-      for (const file of repo.files) {
-        if (file.content) {
-          repoContext += `\n--- ${file.path} ---\n${file.content}\n`;
-        } else {
-          repoContext += `- ${file.path}\n`;
-        }
+    let repositoryContext = "";
+    for (const repository of repositories) {
+      repositoryContext += `\n\nRepository: ${repository.repositoryName}\nBranch: ${repository.branch}\nCommit: ${repository.commit}\nFiles:\n`;
+      for (const file of repository.files) {
+        repositoryContext += file.content
+          ? `\n--- ${file.path} ---\n${file.content}\n`
+          : `- ${file.path}\n`;
       }
     }
 
     const request: SuperAnalyzeRequest = {
       messages: [
         {
-          role: 'system',
-          content: 'You are an expert at analyzing Azure DevOps build logs with repository context. Provide comprehensive analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide detailed analysis with code references.'
+          role: "system",
+          content:
+            "You are an expert at analyzing Azure DevOps build logs with repository context. Provide comprehensive analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide detailed analysis with code references.",
         },
         {
-          role: 'user',
-          content: `Analyze these Azure DevOps build logs with repository context:\n\n# Build Logs\n${logs}\n\n# Repository Context${repoContext}`
-        }
-      ]
+          role: "user",
+          content: `Analyze these Azure DevOps build logs with repository context:\n\n# Build Logs\n${logs}\n\n# Repository Context${repositoryContext}`,
+        },
+      ],
     };
 
-    // Use backendUrl as-is without appending paths
-    const response = await this.sendRequest<SuperAnalyzeRequest, AIResponse>(
-      backendUrl,
-      request,
-      apiKey
-    );
-
-    return response.choices[0].message.content;
+    return this.sendOpenAIRequest(projectId, serviceConnectionName, request);
   }
 
-  /**
-   * Send HTTP request to AI backend with retry logic
-   * @param endpoint - Full endpoint URL
-   * @param payload - Request payload
-   * @param apiKey - Optional API key for authentication
-   * @returns Promise resolving to AI response
-   * @private
-   */
-  private async sendRequest<TRequest, TResponse>(
-    endpoint: string,
-    payload: TRequest,
-    apiKey?: string
-  ): Promise<TResponse> {
+  private async sendOpenAIRequest(
+    projectId: string,
+    serviceConnectionName: string,
+    payload: AnalyzeRequest | SuperAnalyzeRequest
+  ): Promise<string> {
+    const endpoint = await this.getGenericServiceEndpoint(
+      projectId,
+      serviceConnectionName
+    );
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        return await this.executeRequest<TRequest, TResponse>(
+        const proxyResult = await this.executeEndpointRequest(
+          projectId,
           endpoint,
-          payload,
-          apiKey
+          payload
         );
+        const response = this.parseProxyResult(proxyResult);
+        return response.choices[0].message.content;
       } catch (error) {
-        lastError = error as Error;
-        
-        // Don't retry on authentication errors or bad request errors
-        if (this.isNonRetryableError(error)) {
-          throw error;
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (this.isNonRetryableError(lastError) || attempt === this.MAX_RETRIES) {
+          break;
         }
-
-        // If this isn't the last attempt, wait before retrying
-        if (attempt < this.MAX_RETRIES) {
-          console.warn(
-            `Request attempt ${attempt + 1} failed, retrying...`,
-            error
-          );
-          await this.delay(this.RETRY_DELAY * (attempt + 1));
-        }
+        await this.delay(this.RETRY_DELAY * (attempt + 1));
       }
     }
 
-    // All retries exhausted
     throw new Error(
-      `AI backend request failed after ${this.MAX_RETRIES + 1} attempts: ${
-        lastError?.message || "Unknown error"
+      `AI request through service connection failed: ${lastError?.message || "Unknown error"
       }`
     );
   }
 
-  /**
-   * Execute a single HTTP request to the AI backend
-   * @param endpoint - Full endpoint URL
-   * @param payload - Request payload
-   * @param apiKey - Optional API key for authentication
-   * @returns Promise resolving to response data
-   * @private
-   */
-  private async executeRequest<TRequest, TResponse>(
-    endpoint: string,
-    payload: TRequest,
-    apiKey?: string
-  ): Promise<TResponse> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      this.DEFAULT_TIMEOUT
+  private async getGenericServiceEndpoint(
+    projectId: string,
+    serviceConnectionName: string
+  ): Promise<ServiceEndpointSummary> {
+    await SDK.ready();
+    const baseUrl = this.getCollectionBaseUrl();
+    const query = new URLSearchParams({
+      endpointNames: serviceConnectionName,
+      type: "generic",
+      "api-version": "6.0-preview.4",
+    });
+    const response = await fetch(
+      `${baseUrl}/${encodeURIComponent(projectId)}/_apis/serviceendpoint/endpoints?${query}`,
+      {
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      }
     );
 
-    try {
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-
-      // Add authorization header if API key is provided
-      if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      // Handle HTTP error responses
-      if (!response.ok) {
-        await this.handleErrorResponse(response);
-      }
-
-      // Parse and validate response
-      const data = await response.json();
-      
-      if (!this.isValidAIResponse(data)) {
-        throw new Error("AI backend returned invalid response format");
-      }
-
-      return data as TResponse;
-    } catch (error) {
-      clearTimeout(timeoutId);
-
-      // Handle timeout errors
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new Error(
-          "Analysis request timed out. Please try again."
-        );
-      }
-
-      // Handle network errors
-      if (error instanceof TypeError) {
-        throw new Error(
-          "Unable to connect to AI backend. Check configuration."
-        );
-      }
-
-      // Re-throw other errors
-      throw error;
-    }
-  }
-
-  /**
-   * Handle HTTP error responses
-   * @param response - Fetch response object
-   * @throws Error with appropriate message based on status code
-   * @private
-   */
-  private async handleErrorResponse(response: Response): Promise<never> {
-    let errorMessage = `AI backend returned error: ${response.status} ${response.statusText}`;
-
-    try {
-      // Try to extract error message from response body
-      const errorData = await response.json();
-      if (errorData && errorData.error) {
-        errorMessage = errorData.error;
-      } else if (errorData && errorData.message) {
-        errorMessage = errorData.message;
-      }
-    } catch {
-      // Ignore JSON parse errors, use default message
-    }
-
-    switch (response.status) {
-      case 401:
-      case 403:
-        throw new Error(
-          "Invalid API key. Update settings and try again."
-        );
-      case 400:
-        throw new Error(`Bad request: ${errorMessage}`);
-      case 404:
-        throw new Error(
-          "AI backend endpoint not found. Check configuration."
-        );
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        throw new Error(
-          `AI backend service error (${response.status}). Please try again later.`
-        );
-      default:
-        throw new Error(errorMessage);
-    }
-  }
-
-  /**
-   * Check if error is non-retryable (authentication, bad request, etc.)
-   * @param error - Error object
-   * @returns True if error should not be retried
-   * @private
-   */
-  private isNonRetryableError(error: unknown): boolean {
-    if (error instanceof Error) {
-      const message = error.message.toLowerCase();
-      return (
-        message.includes("invalid api key") ||
-        message.includes("bad request") ||
-        message.includes("endpoint not found") ||
-        message.includes("invalid response format")
+    if (!response.ok) {
+      throw new Error(
+        `Unable to resolve service connection (${response.status} ${response.statusText})`
       );
     }
-    return false;
+
+    const data = (await response.json()) as EndpointListResponse;
+    const endpoint = data.value?.find(
+      (item) =>
+        item.name.toLowerCase() === serviceConnectionName.toLowerCase() &&
+        item.type.toLowerCase() === "generic"
+    );
+    if (!endpoint) {
+      throw new Error(
+        `Generic service connection "${serviceConnectionName}" was not found or is not authorized for use`
+      );
+    }
+    if (!endpoint.url) {
+      throw new Error(
+        `Generic service connection "${serviceConnectionName}" has no Server URL`
+      );
+    }
+
+    return endpoint;
   }
 
-  /**
-   * Validate AI response format (OpenAI chat completions format)
-   * @param data - Response data to validate
-   * @returns True if response is valid
-   * @private
-   */
-  private isValidAIResponse(data: unknown): boolean {
+  private async executeEndpointRequest(
+    projectId: string,
+    endpoint: ServiceEndpointSummary,
+    payload: AnalyzeRequest | SuperAnalyzeRequest
+  ): Promise<EndpointProxyResult> {
+    const proxyRequest = {
+      dataSourceDetails: {
+        dataSourceUrl: "{{endpoint.url}}",
+        headers: [
+          { name: "Content-Type", value: "application/json" },
+          { name: "Accept", value: "application/json" },
+        ],
+        initialContextTemplate: "",
+        parameters: {},
+        requestContent: JSON.stringify(payload),
+        requestVerb: "POST",
+        resultSelector: "jsonpath:$",
+      },
+      resultTransformationDetails: {
+        callbackContextTemplate: "",
+        callbackRequiredTemplate: "",
+        resultTemplate: "",
+      },
+      serviceEndpointDetails: {
+        authorization: endpoint.authorization,
+        data: endpoint.data || {},
+        type: endpoint.type,
+        url: endpoint.url,
+      },
+    };
+
+    const baseUrl = this.getCollectionBaseUrl();
+    const query = new URLSearchParams({
+      endpointId: endpoint.id,
+      "api-version": "6.0-preview.1",
+    });
+    const response = await fetch(
+      `${baseUrl}/${encodeURIComponent(projectId)}/_apis/serviceendpoint/endpointproxy?${query}`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(proxyRequest),
+      }
+    );
+
+    if (!response.ok) {
+      const message = await response.text().catch(() => "");
+      if (
+        response.status === 400 &&
+        /enough permissions required/i.test(message) &&
+        /post/i.test(message)
+      ) {
+        throw this.createProxyError(
+          response.status,
+          `Azure DevOps denied endpoint-proxy POST (runtime ${AIService.RUNTIME_VERSION}). Install or approve an extension version granted the vso.serviceendpoint_manage scope. User service-connection permissions do not replace this extension grant.`
+        );
+      }
+      throw this.createProxyError(
+        response.status,
+        `Azure DevOps endpoint proxy returned ${response.status}: ${message || response.statusText}`
+      );
+    }
+
+    return (await response.json()) as EndpointProxyResult;
+  }
+
+  private parseProxyResult(proxyResult: EndpointProxyResult): AIResponse {
+    const statusCode =
+      Number.parseInt(String(proxyResult.statusCode || 0), 10) || 0;
+    if (statusCode >= 400) {
+      throw this.createProxyError(
+        statusCode,
+        `AI backend returned HTTP ${statusCode}${proxyResult.errorMessage ? `: ${proxyResult.errorMessage}` : ""}`
+      );
+    }
+    if (proxyResult.errorMessage) {
+      throw new Error(proxyResult.errorMessage);
+    }
+
+    let result = proxyResult.result;
+    if (typeof result === "string") {
+      try {
+        result = JSON.parse(result);
+      } catch {
+        throw new Error("AI backend returned invalid JSON");
+      }
+    }
+
+    if (!this.isValidAIResponse(result)) {
+      throw new Error("AI backend returned invalid OpenAI response format");
+    }
+
+    return result;
+  }
+
+  private isValidAIResponse(data: unknown): data is AIResponse {
     if (!data || typeof data !== "object") {
       return false;
     }
-
-    const response = data as { choices?: unknown };
-    if (!Array.isArray(response.choices) || response.choices.length === 0) {
+    const choices = (data as { choices?: unknown }).choices;
+    if (!Array.isArray(choices) || choices.length === 0) {
       return false;
     }
-
-    const firstChoice = response.choices[0] as { message?: unknown };
-    if (!firstChoice.message || typeof firstChoice.message !== "object") {
-      return false;
-    }
-
-    const message = firstChoice.message as { content?: unknown };
-    return typeof message.content === "string";
+    const message = (choices[0] as { message?: unknown }).message;
+    return (
+      !!message &&
+      typeof message === "object" &&
+      typeof (message as { content?: unknown }).content === "string"
+    );
   }
 
-  /**
-   * Delay helper for retry logic
-   * @param ms - Milliseconds to delay
-   * @returns Promise that resolves after delay
-   * @private
-   */
+  private getCollectionBaseUrl(): string {
+    const host = SDK.getHost();
+    const origin = window.location.origin;
+    return `${origin}/tfs/${encodeURIComponent(host.name)}`;
+  }
+
+  private createProxyError(statusCode: number, message: string): Error {
+    const error = new Error(message) as Error & { statusCode: number };
+    error.statusCode = statusCode;
+    return error;
+  }
+
+  private isNonRetryableError(error: Error): boolean {
+    const statusCode = (error as Error & { statusCode?: number }).statusCode;
+    if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
+      return true;
+    }
+
+    const message = error.message.toLowerCase();
+    return (
+      message.includes("was not found") ||
+      message.includes("not authorized") ||
+      message.includes("has no server url") ||
+      message.includes("invalid openai response") ||
+      message.includes("invalid json") ||
+      message.includes("invalidserviceendpointrequestexception") ||
+      message.includes("invaliddatasourcebindingexception")
+    );
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }

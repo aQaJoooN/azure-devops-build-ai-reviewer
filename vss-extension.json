@@ -6,8 +6,16 @@
   "publisher": "aQaJoooN",
   "public": true,
   "description": "AI-powered build log analysis extension for Azure DevOps. Analyze build failures with AI assistance.",
-  "categories": ["Azure Pipelines"],
-  "tags": ["AI", "Build", "Analysis", "Logs", "DevOps"],
+  "categories": [
+    "Azure Pipelines"
+  ],
+  "tags": [
+    "AI",
+    "Build",
+    "Analysis",
+    "Logs",
+    "DevOps"
+  ],
   "targets": [
     {
       "id": "Microsoft.VisualStudio.Services"
@@ -36,7 +44,8 @@
   "scopes": [
     "vso.build",
     "vso.code",
-    "vso.project"
+    "vso.project",
+    "vso.serviceendpoint_manage"
   ],
   "contributions": [
     {

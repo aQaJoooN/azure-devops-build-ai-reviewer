@@ -52,20 +52,15 @@ class AnalyzerTabController {
   async initialize(): Promise<void> {
     try {
       console.log("=== Initializing AI Analyzer Tab ===");
+      this.initializeUIElements();
 
-      // Initialize Azure DevOps SDK. Use the default loaded:true handshake,
-      // which is reliable on Azure DevOps Server 2022. (loaded:false leaves
-      // the tab stuck on the loading spinner on this server version.)
-      await SDK.init({ applyTheme: true });
-
-      // Attempt to register the dynamic tab visibility callback. On Azure
-      // DevOps Server 2022 this is generally NOT honored, so the tab stays
-      // visible and shows an in-tab "disabled" message instead. Harmless to
-      // register on hosts that do support it.
-      this.registerTabVisibility();
-
+      // Complete the host load handshake before project, settings, or storage
+      // requests. Slow REST calls must not leave the Azure DevOps tab spinner
+      // waiting for this extension.
+      await SDK.init({ loaded: false, applyTheme: true });
       await SDK.ready();
-      console.log("SDK initialized and ready");
+      await SDK.notifyLoadSucceeded();
+      console.log("SDK initialized and host notified");
 
       // Get configuration and apply theme
       const configuration = SDK.getConfiguration();
@@ -145,10 +140,6 @@ class AnalyzerTabController {
         throw new Error("Build ID not available. Please open this tab from a build result page.");
       }
 
-      // Initialize UI elements
-      this.initializeUIElements();
-      console.log("UI elements initialized");
-
       // Check if extension is enabled
       const isEnabled = await this.settingsService.isExtensionEnabled(this.projectId);
       console.log("Extension enabled:", isEnabled);
@@ -216,50 +207,6 @@ class AnalyzerTabController {
           ? error.message
           : "Failed to initialize AI Analyzer. Please refresh the page."
       );
-    }
-  }
-
-  /**
-   * Register the contribution instance the host uses to decide whether to
-   * show the build-results tab. The host calls isInvisible() (dynamic tabs)
-   * before rendering the tab header; returning true hides the tab entirely
-   * when the extension is disabled for the project.
-   */
-  private registerTabVisibility(): void {
-    try {
-      const contributionId = SDK.getContributionId();
-      SDK.register(contributionId, {
-        // Newer hosts use isInvisible()
-        isInvisible: async () => {
-          const hidden = !(await this.checkEnabled());
-          console.log("Tab isInvisible ->", hidden);
-          return hidden;
-        },
-        // Some hosts use isVisible()
-        isVisible: async () => {
-          const visible = await this.checkEnabled();
-          console.log("Tab isVisible ->", visible);
-          return visible;
-        },
-      });
-      console.log("Tab visibility callback registered for:", contributionId);
-    } catch (error) {
-      console.warn("Could not register tab visibility callback:", error);
-    }
-  }
-
-  /**
-   * Resolve whether the extension is enabled for the current project.
-   * Cached-safe: reads settings via the settings service.
-   */
-  private async checkEnabled(): Promise<boolean> {
-    try {
-      const projectId = this.projectId || (await this.getProjectId());
-      this.projectId = projectId;
-      return await this.settingsService.isExtensionEnabled(projectId);
-    } catch (error) {
-      console.warn("checkEnabled failed, assuming enabled:", error);
-      return true;
     }
   }
 
@@ -454,8 +401,10 @@ class AnalyzerTabController {
       const settings = await this.settingsService.getSettings(this.projectId);
       console.log("Settings:", settings);
 
-      if (!settings.aiBackendUrl) {
-        throw new Error("AI backend URL not configured. Please update extension settings.");
+      if (!settings.serviceConnectionName) {
+        throw new Error(
+          "Generic service connection is not configured. Please update extension settings."
+        );
       }
 
       console.log("Getting build status...");
@@ -478,9 +427,9 @@ class AnalyzerTabController {
       console.log("Calling AI service...");
       // Call AI service for analysis
       const analysisMarkdown = await this.aiService.analyze(
-        settings.aiBackendUrl,
-        logs,
-        settings.apiKey
+        this.projectId,
+        settings.serviceConnectionName,
+        logs
       );
 
       console.log("Analysis received, length:", analysisMarkdown.length);
@@ -529,8 +478,10 @@ class AnalyzerTabController {
       // Get settings for AI backend configuration
       const settings = await this.settingsService.getSettings(this.projectId);
 
-      if (!settings.aiBackendUrl) {
-        throw new Error("AI backend URL not configured. Please update extension settings.");
+      if (!settings.serviceConnectionName) {
+        throw new Error(
+          "Generic service connection is not configured. Please update extension settings."
+        );
       }
 
       if (!settings.superAnalyzeEnabled) {
@@ -549,10 +500,10 @@ class AnalyzerTabController {
 
       // Call AI service for super analysis
       const analysisMarkdown = await this.aiService.superAnalyze(
-        settings.aiBackendUrl,
+        this.projectId,
+        settings.serviceConnectionName,
         logs,
-        [repositoryContext],
-        settings.apiKey
+        [repositoryContext]
       );
 
       // Create analysis result

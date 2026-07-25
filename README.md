@@ -25,9 +25,10 @@ This identity replaces `aQaJoooN.azure-devops-ai-analyzer`. Azure DevOps treats 
 
 1. Install the extension from the Visual Studio Marketplace
 2. Navigate to Project Settings → AI Analyzer Settings
-3. Enable the extension and configure your AI backend URL
-4. (Optional) Add an API key if your backend requires authentication
-5. (Optional) Enable Super Analyze for comprehensive analysis
+3. Create or select a project-level Generic service connection
+4. Set its Server URL to the complete OpenAI-compatible chat-completions endpoint and configure authentication in the service connection
+5. Enable the extension and enter the exact service connection name
+6. (Optional) Enable Super Analyze for comprehensive analysis
 
 ## Usage
 
@@ -42,14 +43,18 @@ This identity replaces `aQaJoooN.azure-devops-ai-analyzer`. Azure DevOps treats 
 Configure the extension in Project Settings → AI Analyzer Settings:
 
 - **Enable Extension**: Toggle to enable/disable the extension for the project
-- **AI Backend URL**: The endpoint URL for your AI service
-- **API Key**: (Optional) Authentication key for your AI backend
+- **Generic Service Connection Name**: Exact name of a project-level Generic service connection. This field is required when the extension is enabled.
+- **Server URL**: Configure the service connection's Server URL as the complete OpenAI-compatible chat-completions endpoint.
+- **Authentication**: Configure credentials only in the Azure DevOps service connection. The extension does not store or expose them.
+- **Extension authorization on Azure DevOps Server**: Install or update to a version granted `vso.serviceendpoint_manage`, then approve the requested scope. User service-connection permissions do not substitute for the extension grant.
 - **Enable Super Analyze**: Toggle to enable/disable comprehensive analysis mode
+
+Analyze and Super Analyze requests are sent through the Azure DevOps service-endpoint proxy. The browser does not call the AI backend directly, avoiding browser CORS and HTTPS-to-HTTP mixed-content restrictions.
 
 ## Project Structure
 
 ```
-azure-devops-ai-analyzer/
+ai-analyzer/
 ├── src/
 │   ├── settings/           # Project settings page
 │   ├── analyzer-tab/       # AI Analyzer build results tab
