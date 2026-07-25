@@ -2,7 +2,7 @@ import * as SDK from "azure-devops-extension-sdk";
 import { CommonServiceIds, IProjectPageService, getClient } from "azure-devops-extension-api";
 import { BuildRestClient } from "azure-devops-extension-api/Build";
 import { GitRestClient } from "azure-devops-extension-api/Git";
-import { BuildStatus } from "../models/build-data";
+import { BuildStatus, TimelineResponse } from "../models/build-data";
 import { RepositoryContext, FileInfo } from "../models/analysis";
 
 /**
@@ -130,42 +130,105 @@ export class BuildService {
   }
 
   /**
-   * Get error logs for a specific build
-   * Filters logs to include only lines containing error keywords
-   * @param buildId - The build ID
-   * @returns Promise resolving to filtered error log content
+   * Select logs appropriate for AI analysis.
+   * Failed and partially successful builds use only failed task logs;
+   * all other statuses use the complete build logs.
    */
-  async getErrorLogs(buildId: number): Promise<string> {
+  async getLogsForAnalysis(
+    buildId: number,
+    status: BuildStatus
+  ): Promise<string> {
+    if (status === "failed" || status === "partiallySucceeded") {
+      return this.getFailedTaskLogs(buildId);
+    }
+
+    return this.getBuildLogs(buildId);
+  }
+
+  /** Retrieve and combine logs attached to failed or abandoned tasks. */
+  private async getFailedTaskLogs(buildId: number): Promise<string> {
     try {
-      // Get full logs first
-      const fullLogs = await this.getBuildLogs(buildId);
-      
-      if (!fullLogs) {
-        return "";
+      const timeline = await this.getBuildTimeline(buildId);
+      const failedTasks = timeline.records.filter((record) => {
+        const result = record.result?.toLowerCase();
+        return (
+          record.type.toLowerCase() === "task" &&
+          (result === "failed" || result === "abandoned") &&
+          record.log?.id !== undefined
+        );
+      });
+
+      console.log(`Found ${failedTasks.length} failed tasks for build ${buildId}`);
+
+      if (failedTasks.length === 0) {
+        console.warn("No failed task logs found; falling back to complete logs");
+        return this.getBuildLogs(buildId);
       }
 
-      // Filter for error lines
-      const errorKeywords = ['error', 'fail', 'failed', 'failure', 'exception', 'fatal'];
-      const lines = fullLogs.split("\n");
-      const errorLines: string[] = [];
+      const taskLogs = await Promise.all(
+        failedTasks.map(async (task) => {
+          const content = await this.getTaskLog(buildId, task.log!.id);
+          return content ? `=== Task: ${task.name} ===\n${content}` : "";
+        })
+      );
+      const logs = taskLogs.filter(Boolean).join("\n\n");
 
-      for (const line of lines) {
-        const lowerLine = line.toLowerCase();
-        if (errorKeywords.some(keyword => lowerLine.includes(keyword))) {
-          errorLines.push(line);
-        }
+      if (!logs) {
+        console.warn("Failed task logs were empty; falling back to complete logs");
+        return this.getBuildLogs(buildId);
       }
 
-      // If no error lines found, return last 5000 lines as fallback
-      if (errorLines.length === 0) {
-        const lastLines = lines.slice(-5000);
-        return lastLines.join("\n");
-      }
-
-      return errorLines.join("\n");
+      return logs;
     } catch (error) {
-      console.error(`Error retrieving error logs for build ${buildId}:`, error);
-      throw new Error("Failed to retrieve error logs");
+      console.warn("Could not retrieve failed task logs; using complete logs", error);
+      return this.getBuildLogs(buildId);
+    }
+  }
+
+  /** Fetch the execution timeline for a build. */
+  private async getBuildTimeline(buildId: number): Promise<TimelineResponse> {
+    const projectId = await this.getProjectId();
+    const host = SDK.getHost();
+    const origin = window.location.origin;
+    const url = `${origin}/tfs/${host.name}/${projectId}/_apis/build/builds/${buildId}/timeline?api-version=5.0`;
+    const response = await fetch(url, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Timeline request failed: HTTP ${response.status}`);
+    }
+
+    const timeline = (await response.json()) as TimelineResponse;
+    if (!Array.isArray(timeline.records)) {
+      throw new Error("Timeline response did not contain records");
+    }
+
+    console.log(`Retrieved ${timeline.records.length} timeline records`);
+    return timeline;
+  }
+
+  /** Fetch one task log, allowing other task logs to continue on failure. */
+  private async getTaskLog(buildId: number, logId: number): Promise<string> {
+    try {
+      const projectId = await this.getProjectId();
+      const host = SDK.getHost();
+      const origin = window.location.origin;
+      const url = `${origin}/tfs/${host.name}/${projectId}/_apis/build/builds/${buildId}/logs/${logId}?api-version=5.0`;
+      const response = await fetch(url, {
+        credentials: "include",
+        headers: { Accept: "text/plain" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return response.text();
+    } catch (error) {
+      console.warn(`Failed to fetch task log ${logId}:`, error);
+      return "";
     }
   }
 

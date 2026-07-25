@@ -2,6 +2,14 @@
 
 AI-powered build log analysis extension for Azure DevOps.
 
+## Extension Identity
+
+- Extension ID: `ai-analyzer`
+- Settings contribution: `aQaJoooN.ai-analyzer.settings`
+- Build results contribution: `aQaJoooN.ai-analyzer.tab`
+
+This identity replaces `aQaJoooN.azure-devops-ai-analyzer`. Azure DevOps treats it as a new extension, so previous installations and extension-scoped settings are not migrated automatically.
+
 ## Features
 
 - **AI-Powered Analysis**: Analyze build failures using configurable AI backends

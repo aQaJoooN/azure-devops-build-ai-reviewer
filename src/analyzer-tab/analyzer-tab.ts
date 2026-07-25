@@ -463,16 +463,11 @@ class AnalyzerTabController {
       const buildStatus = await this.buildService.getBuildStatus(this.buildId);
       console.log("Build status:", buildStatus);
 
-      let logs: string;
-      if (buildStatus === 'failed') {
-        console.log("Getting error logs...");
-        // Get error logs for failed builds
-        logs = await this.buildService.getErrorLogs(this.buildId);
-      } else {
-        console.log("Getting full logs...");
-        // Get full logs for successful builds
-        logs = await this.buildService.getBuildLogs(this.buildId);
-      }
+      // Select focused failed-task logs or complete logs based on build status.
+      const logs = await this.buildService.getLogsForAnalysis(
+        this.buildId,
+        buildStatus
+      );
 
       console.log("Logs retrieved, length:", logs.length);
 

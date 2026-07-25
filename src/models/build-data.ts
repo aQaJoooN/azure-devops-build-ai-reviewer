@@ -1,51 +1,32 @@
-/**
- * Build status type
- * Represents the possible states of a build run
- */
-export type BuildStatus = 'succeeded' | 'failed' | 'partiallySucceeded' | 'canceled' | 'inProgress' | 'none';
+/** Possible Azure DevOps build states used by log selection. */
+export type BuildStatus =
+  | "succeeded"
+  | "failed"
+  | "partiallySucceeded"
+  | "canceled"
+  | "inProgress"
+  | "none";
 
-/**
- * Build data interface
- * Contains information about a specific build run
- */
-export interface BuildData {
-  /**
-   * Unique identifier of the build
-   */
+/** Log reference attached to a timeline task. */
+export interface TimelineLogReference {
   id: number;
+  url?: string;
+}
 
-  /**
-   * Build number (user-friendly identifier)
-   */
-  buildNumber: string;
-
-  /**
-   * Current status of the build
-   */
-  status: BuildStatus;
-
-  /**
-   * Result of the build (if completed)
-   */
+/** Relevant fields returned for an Azure DevOps timeline record. */
+export interface TimelineRecord {
+  id: string;
+  name: string;
+  type: string;
   result?: string;
+  log?: TimelineLogReference;
+  issues?: Array<{
+    type: string;
+    message: string;
+  }>;
+}
 
-  /**
-   * ID of the repository that was built
-   */
-  repositoryId?: string;
-
-  /**
-   * Name of the repository that was built
-   */
-  repositoryName?: string;
-
-  /**
-   * Branch that was built
-   */
-  sourceBranch?: string;
-
-  /**
-   * Commit SHA that was built
-   */
-  sourceVersion?: string;
+/** Azure DevOps build timeline response. */
+export interface TimelineResponse {
+  records: TimelineRecord[];
 }

@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "id": "azure-devops-ai-analyzer",
+  "id": "ai-analyzer",
   "name": "AI Analyzer for Build Logs",
   "version": "1.0.0",
   "publisher": "aQaJoooN",
@@ -40,7 +40,7 @@
   ],
   "contributions": [
     {
-      "id": "ai-analyzer-settings",
+      "id": "settings",
       "type": "ms.vss-web.hub",
       "description": "AI Analyzer extension settings page",
       "targets": [
@@ -54,7 +54,7 @@
       }
     },
     {
-      "id": "ai-analyzer-tab",
+      "id": "tab",
       "type": "ms.vss-build-web.build-results-tab",
       "description": "AI-powered build log analysis tab",
       "targets": [
