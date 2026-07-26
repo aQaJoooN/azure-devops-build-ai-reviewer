@@ -153,7 +153,12 @@ class AnalyzerTabController {
 
       // Load settings to check super analyze availability
       const settings = await this.settingsService.getSettings(this.projectId);
-      console.log("Settings loaded:", settings);
+      console.log("Settings loaded:", {
+        enabled: settings.enabled,
+        aiServiceConfigured: !!settings.aiServiceUrl,
+        tokenConfigured: !!settings.aiServiceToken,
+        superAnalyzeEnabled: settings.superAnalyzeEnabled,
+      });
       console.log("Super analyze enabled:", settings.superAnalyzeEnabled);
       console.log("Super analyze button element:", this.superAnalyzeButton);
       console.log("Super analyze help element:", this.superAnalyzeHelp);
@@ -166,7 +171,6 @@ class AnalyzerTabController {
         } else {
           console.error("Super analyze button element not found!");
         }
-
         if (this.superAnalyzeHelp) {
           console.log("Showing super analyze help");
           this.superAnalyzeHelp.style.display = "block";
@@ -401,11 +405,14 @@ class AnalyzerTabController {
 
       // Get settings for AI backend configuration
       const settings = await this.settingsService.getSettings(this.projectId);
-      console.log("Settings:", settings);
+      console.log("AI settings retrieved", {
+        urlConfigured: !!settings.aiServiceUrl,
+        tokenConfigured: !!settings.aiServiceToken,
+      });
 
-      if (!settings.serviceConnectionName) {
+      if (!settings.aiServiceUrl) {
         throw new Error(
-          "Generic service connection is not configured. Please update extension settings."
+          "AI service URL is not configured. Please update extension settings."
         );
       }
 
@@ -429,8 +436,8 @@ class AnalyzerTabController {
       console.log("Calling AI service...");
       // Call AI service for analysis
       const analysisMarkdown = await this.aiService.analyze(
-        this.projectId,
-        settings.serviceConnectionName,
+        settings.aiServiceUrl,
+        settings.aiServiceToken,
         logs
       );
 
@@ -480,9 +487,9 @@ class AnalyzerTabController {
       // Get settings for AI backend configuration
       const settings = await this.settingsService.getSettings(this.projectId);
 
-      if (!settings.serviceConnectionName) {
+      if (!settings.aiServiceUrl) {
         throw new Error(
-          "Generic service connection is not configured. Please update extension settings."
+          "AI service URL is not configured. Please update extension settings."
         );
       }
 
@@ -502,8 +509,8 @@ class AnalyzerTabController {
 
       // Call AI service for super analysis
       const analysisMarkdown = await this.aiService.superAnalyze(
-        this.projectId,
-        settings.serviceConnectionName,
+        settings.aiServiceUrl,
+        settings.aiServiceToken,
         logs,
         [repositoryContext]
       );

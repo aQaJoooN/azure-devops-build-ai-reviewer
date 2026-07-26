@@ -23,12 +23,11 @@ This identity replaces `aQaJoooN.azure-devops-ai-analyzer`. Azure DevOps treats 
 
 ## Installation
 
-1. Install the extension from the Visual Studio Marketplace
+1. Install the extension
 2. Navigate to Project Settings → AI Analyzer Settings
-3. Create or select a project-level Generic service connection
-4. Set its Server URL to the complete OpenAI-compatible chat-completions endpoint and configure authentication in the service connection
-5. Enable the extension and enter the exact service connection name
-6. (Optional) Enable Super Analyze for comprehensive analysis
+3. Enter the complete HTTP or HTTPS URL of the OpenAI-compatible endpoint
+4. Optionally enter a bearer access token
+5. Enable the extension and optionally enable Super Analyze
 
 ## Usage
 
@@ -43,13 +42,12 @@ This identity replaces `aQaJoooN.azure-devops-ai-analyzer`. Azure DevOps treats 
 Configure the extension in Project Settings → AI Analyzer Settings:
 
 - **Enable Extension**: Toggle to enable/disable the extension for the project
-- **Generic Service Connection Name**: Exact name of a project-level Generic service connection. This field is required when the extension is enabled.
-- **Server URL**: Configure the service connection's Server URL as the complete OpenAI-compatible chat-completions endpoint.
-- **Authentication**: Configure credentials only in the Azure DevOps service connection. The extension does not store or expose them.
-- **Extension authorization on Azure DevOps Server**: Install or update to a version granted `vso.serviceendpoint_manage`, then approve the requested scope. User service-connection permissions do not substitute for the extension grant.
+- **AI Service URL**: Complete HTTP or HTTPS OpenAI-compatible endpoint. Its CORS policy must allow the Azure DevOps origin. If Azure DevOps is loaded over HTTPS, the browser may block an HTTP endpoint as mixed content.
+- **Access Token**: Optional bearer token stored separately from general settings in project-specific extension data. A fixed mask indicates that a token exists without exposing it. Keep the mask to preserve the token, clear the field to delete it, or type a new token to replace it.
+- **Browser security note**: Requests are sent directly from the extension iframe, so the token is present in the browser while a request is made. Users with browser debugging access can inspect it. Use a narrowly scoped, revocable token and restrict the AI service with CORS and server-side authorization.
 - **Enable Super Analyze**: Toggle to enable/disable comprehensive analysis mode
 
-Analyze and Super Analyze requests are sent through the Azure DevOps service-endpoint proxy. The browser does not call the AI backend directly, avoiding browser CORS and HTTPS-to-HTTP mixed-content restrictions.
+Analyze and Super Analyze requests are sent directly from the extension iframe. The AI service must handle CORS preflight requests for `POST`, `Content-Type`, and `Authorization`. HTTPS is recommended; HTTP is allowed for compatible on-premises environments.
 
 ## Project Structure
 

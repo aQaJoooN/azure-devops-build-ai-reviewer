@@ -8,11 +8,14 @@ export interface ExtensionSettings {
    */
   enabled: boolean;
 
-  /**
-   * Name of the Azure DevOps Generic service connection whose Server URL
-   * points to the OpenAI-compatible chat-completions endpoint.
-   */
-  serviceConnectionName: string;
+  /** Complete HTTP or HTTPS URL of the OpenAI-compatible endpoint. */
+  aiServiceUrl: string;
+
+  /** Optional bearer token loaded only by the analyzer runtime. */
+  aiServiceToken: string;
+
+  /** Whether a token exists without exposing its value to the settings page. */
+  aiServiceTokenConfigured: boolean;
 
   /**
    * Whether the super analyze feature is enabled

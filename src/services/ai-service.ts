@@ -1,7 +1,3 @@
-import * as SDK from "azure-devops-extension-sdk";
-
-declare const __APP_VERSION__: string;
-
 import {
   AIResponse,
   AnalyzeRequest,
@@ -9,40 +5,14 @@ import {
   SuperAnalyzeRequest,
 } from "../models/analysis";
 
-interface ServiceEndpointSummary {
-  id: string;
-  name: string;
-  type: string;
-  url: string;
-  authorization?: {
-    parameters: Record<string, string>;
-    scheme: string;
-  };
-  data?: Record<string, string>;
-}
-
-interface EndpointListResponse {
-  value?: ServiceEndpointSummary[];
-}
-
-interface EndpointProxyResult {
-  errorMessage?: string;
-  result?: unknown;
-  statusCode?: string | number;
-}
-
-/**
- * Sends OpenAI-compatible requests through an Azure DevOps Generic service
- * connection. Azure DevOps performs the backend HTTP request server-side,
- * avoiding browser mixed-content and CORS restrictions.
- */
+/** Calls the configured OpenAI-compatible endpoint directly from the iframe. */
 export class AIService {
   private readonly MAX_RETRIES = 2;
   private readonly RETRY_DELAY = 1000;
 
   async analyze(
-    projectId: string,
-    serviceConnectionName: string,
+    serviceUrl: string,
+    token: string,
     logs: string
   ): Promise<string> {
     const request: AnalyzeRequest = {
@@ -59,12 +29,12 @@ export class AIService {
       ],
     };
 
-    return this.sendOpenAIRequest(projectId, serviceConnectionName, request);
+    return this.sendRequest(serviceUrl, token, request);
   }
 
   async superAnalyze(
-    projectId: string,
-    serviceConnectionName: string,
+    serviceUrl: string,
+    token: string,
     logs: string,
     repositories: RepositoryContext[]
   ): Promise<string> {
@@ -77,7 +47,6 @@ export class AIService {
           : `- ${file.path}\n`;
       }
     }
-
     const request: SuperAnalyzeRequest = {
       messages: [
         {
@@ -92,186 +61,82 @@ export class AIService {
       ],
     };
 
-    return this.sendOpenAIRequest(projectId, serviceConnectionName, request);
+    return this.sendRequest(serviceUrl, token, request);
   }
 
-  private async sendOpenAIRequest(
-    projectId: string,
-    serviceConnectionName: string,
+  private async sendRequest(
+    serviceUrl: string,
+    token: string,
     payload: AnalyzeRequest | SuperAnalyzeRequest
   ): Promise<string> {
-    const endpoint = await this.getGenericServiceEndpoint(
-      projectId,
-      serviceConnectionName
-    );
+    this.validateServiceUrl(serviceUrl);
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       try {
-        const proxyResult = await this.executeEndpointRequest(
-          projectId,
-          endpoint,
-          payload
-        );
-        const response = this.parseProxyResult(proxyResult);
-        return response.choices[0].message.content;
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(serviceUrl, {
+          method: "POST",
+          mode: "cors",
+          credentials: "omit",
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const message = await response.text().catch(() => "");
+          const error = new Error(
+            `AI service returned HTTP ${response.status}: ${
+              message || response.statusText
+            }`
+          ) as Error & { statusCode: number };
+          error.statusCode = response.status;
+          throw error;
+        }
+
+        const result = (await response.json()) as unknown;
+        if (!this.isValidAIResponse(result)) {
+          throw new Error("AI service returned invalid OpenAI response format");
+        }
+        return result.choices[0].message.content;
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (this.isNonRetryableError(lastError) || attempt === this.MAX_RETRIES) {
+        lastError = this.toRequestError(error);
+        if (this.isNonRetryable(lastError) || attempt === this.MAX_RETRIES) {
           break;
         }
         await this.delay(this.RETRY_DELAY * (attempt + 1));
       }
     }
 
-    throw new Error(
-      `AI request through service connection failed: ${lastError?.message || "Unknown error"
-      }`
-    );
+    throw new Error(`AI request failed: ${lastError?.message || "Unknown error"}`);
   }
 
-  private async getGenericServiceEndpoint(
-    projectId: string,
-    serviceConnectionName: string
-  ): Promise<ServiceEndpointSummary> {
-    await SDK.ready();
-    const baseUrl = this.getCollectionBaseUrl();
-    const query = new URLSearchParams({
-      endpointNames: serviceConnectionName,
-      type: "generic",
-      "api-version": "6.0-preview.4",
-    });
-    const response = await fetch(
-      `${baseUrl}/${encodeURIComponent(projectId)}/_apis/serviceendpoint/endpoints?${query}`,
-      {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Unable to resolve service connection (${response.status} ${response.statusText})`
-      );
+  private validateServiceUrl(serviceUrl: string): void {
+    let url: URL;
+    try {
+      url = new URL(serviceUrl);
+    } catch {
+      throw new Error("AI service URL is invalid");
     }
-
-    const data = (await response.json()) as EndpointListResponse;
-    const endpoint = data.value?.find(
-      (item) =>
-        item.name.toLowerCase() === serviceConnectionName.toLowerCase() &&
-        item.type.toLowerCase() === "generic"
-    );
-    if (!endpoint) {
-      throw new Error(
-        `Generic service connection "${serviceConnectionName}" was not found or is not authorized for use`
-      );
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("AI service URL must use HTTP or HTTPS");
     }
-    if (!endpoint.url) {
-      throw new Error(
-        `Generic service connection "${serviceConnectionName}" has no Server URL`
-      );
-    }
-
-    return endpoint;
   }
 
-  private async executeEndpointRequest(
-    projectId: string,
-    endpoint: ServiceEndpointSummary,
-    payload: AnalyzeRequest | SuperAnalyzeRequest
-  ): Promise<EndpointProxyResult> {
-    const proxyRequest = {
-      dataSourceDetails: {
-        dataSourceUrl: "{{endpoint.url}}",
-        headers: [
-          { name: "Content-Type", value: "application/json" },
-          { name: "Accept", value: "application/json" },
-        ],
-        initialContextTemplate: "",
-        parameters: {},
-        requestContent: JSON.stringify(payload),
-        requestVerb: "POST",
-        resultSelector: "jsonpath:$",
-      },
-      resultTransformationDetails: {
-        callbackContextTemplate: "",
-        callbackRequiredTemplate: "",
-        resultTemplate: "",
-      },
-      serviceEndpointDetails: {
-        authorization: endpoint.authorization,
-        data: endpoint.data || {},
-        type: endpoint.type,
-        url: endpoint.url,
-      },
-    };
-
-    const baseUrl = this.getCollectionBaseUrl();
-    const query = new URLSearchParams({
-      endpointId: endpoint.id,
-      "api-version": "6.0-preview.1",
-    });
-    const response = await fetch(
-      `${baseUrl}/${encodeURIComponent(projectId)}/_apis/serviceendpoint/endpointproxy?${query}`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(proxyRequest),
-      }
-    );
-
-    if (!response.ok) {
-      const message = await response.text().catch(() => "");
-      if (
-        response.status === 400 &&
-        /enough permissions required/i.test(message) &&
-        /post/i.test(message)
-      ) {
-        throw this.createProxyError(
-          response.status,
-          `Azure DevOps denied endpoint-proxy POST (runtime ${__APP_VERSION__}). Install or approve an extension version granted the vso.serviceendpoint_manage scope. User service-connection permissions do not replace this extension grant.`
-        );
-      }
-      throw this.createProxyError(
-        response.status,
-        `Azure DevOps endpoint proxy returned ${response.status}: ${message || response.statusText}`
+  private toRequestError(error: unknown): Error {
+    if (error instanceof TypeError) {
+      return new Error(
+        "Unable to reach the AI service. Check network access, CORS policy, and whether the browser blocked an HTTP request from an HTTPS page."
       );
     }
-
-    return (await response.json()) as EndpointProxyResult;
-  }
-
-  private parseProxyResult(proxyResult: EndpointProxyResult): AIResponse {
-    const statusCode =
-      Number.parseInt(String(proxyResult.statusCode || 0), 10) || 0;
-    if (statusCode >= 400) {
-      throw this.createProxyError(
-        statusCode,
-        `AI backend returned HTTP ${statusCode}${proxyResult.errorMessage ? `: ${proxyResult.errorMessage}` : ""}`
-      );
-    }
-    if (proxyResult.errorMessage) {
-      throw new Error(proxyResult.errorMessage);
-    }
-
-    let result = proxyResult.result;
-    if (typeof result === "string") {
-      try {
-        result = JSON.parse(result);
-      } catch {
-        throw new Error("AI backend returned invalid JSON");
-      }
-    }
-
-    if (!this.isValidAIResponse(result)) {
-      throw new Error("AI backend returned invalid OpenAI response format");
-    }
-
-    return result;
+    return error instanceof Error ? error : new Error(String(error));
   }
 
   private isValidAIResponse(data: unknown): data is AIResponse {
@@ -290,33 +155,12 @@ export class AIService {
     );
   }
 
-  private getCollectionBaseUrl(): string {
-    const host = SDK.getHost();
-    const origin = window.location.origin;
-    return `${origin}/tfs/${encodeURIComponent(host.name)}`;
-  }
-
-  private createProxyError(statusCode: number, message: string): Error {
-    const error = new Error(message) as Error & { statusCode: number };
-    error.statusCode = statusCode;
-    return error;
-  }
-
-  private isNonRetryableError(error: Error): boolean {
+  private isNonRetryable(error: Error): boolean {
     const statusCode = (error as Error & { statusCode?: number }).statusCode;
-    if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) {
-      return true;
-    }
-
-    const message = error.message.toLowerCase();
     return (
-      message.includes("was not found") ||
-      message.includes("not authorized") ||
-      message.includes("has no server url") ||
-      message.includes("invalid openai response") ||
-      message.includes("invalid json") ||
-      message.includes("invalidserviceendpointrequestexception") ||
-      message.includes("invaliddatasourcebindingexception")
+      (statusCode !== undefined && statusCode >= 400 && statusCode < 500) ||
+      error.message.includes("URL") ||
+      error.message.includes("invalid OpenAI response")
     );
   }
 

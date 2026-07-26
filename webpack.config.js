@@ -6,17 +6,17 @@ const { version } = require('./package.json');
 module.exports = (env, argv) => {
   const mode = argv.mode || 'development';
   const isDevelopment = mode === 'development';
-  
+
   return {
     // Set mode for webpack optimizations
     mode: mode,
-    
+
     // Entry points for settings page and analyzer tab
     entry: {
       settings: './src/settings/settings.ts',
       'analyzer-tab': './src/analyzer-tab/analyzer-tab.ts'
     },
-    
+
     // Output bundle structure
     output: {
       filename: '[name].[contenthash:8].js',
@@ -24,7 +24,7 @@ module.exports = (env, argv) => {
       clean: true, // Clean dist folder before each build
       publicPath: ''
     },
-    
+
     // Module rules for processing different file types
     module: {
       rules: [
@@ -65,17 +65,24 @@ module.exports = (env, argv) => {
         }
       ]
     },
-    
+
     // Resolve extensions for imports
     resolve: {
       extensions: ['.tsx', '.ts', '.js', '.json'],
       alias: {
+        // The SDK package exports separate ESM and CommonJS builds. The API
+        // package requests CommonJS while application imports select ESM,
+        // which otherwise initializes the SDK twice in one iframe.
+        'azure-devops-extension-sdk$': path.resolve(
+          __dirname,
+          'node_modules/azure-devops-extension-sdk/esm/SDK.min.js'
+        ),
         '@services': path.resolve(__dirname, 'src/services'),
         '@models': path.resolve(__dirname, 'src/models'),
         '@utils': path.resolve(__dirname, 'src/utils')
       }
     },
-    
+
     // HTML processing plugins
     plugins: [
       new webpack.DefinePlugin({
@@ -108,10 +115,10 @@ module.exports = (env, argv) => {
         }
       })
     ],
-    
+
     // Development and production build configurations
     devtool: isDevelopment ? 'source-map' : false,
-    
+
     // Optimization settings
     optimization: {
       minimize: !isDevelopment,
@@ -134,14 +141,14 @@ module.exports = (env, argv) => {
         }
       }
     },
-    
+
     // Performance hints
     performance: {
       hints: isDevelopment ? false : 'warning',
       maxEntrypointSize: 512000,
       maxAssetSize: 512000
     },
-    
+
     // Stats output configuration
     stats: {
       colors: true,

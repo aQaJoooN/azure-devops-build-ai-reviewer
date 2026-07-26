@@ -43,8 +43,7 @@
   "scopes": [
     "vso.build",
     "vso.code",
-    "vso.project",
-    "vso.serviceendpoint_manage"
+    "vso.project"
   ],
   "contributions": [
     {
