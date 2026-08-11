@@ -1,64 +1,57 @@
-import {
-  AIResponse,
-  AnalyzeRequest,
-  RepositoryContext,
-  SuperAnalyzeRequest,
-} from "../models/analysis";
+import { AIResponse, ChatRequest } from "../models/analysis";
+import { BuildStatus } from "../models/build-data";
 
-/** Calls the configured OpenAI-compatible endpoint directly from the iframe. */
+/** Calls the configured BFF AI endpoint directly from the iframe. */
 export class AIService {
   private readonly MAX_RETRIES = 2;
   private readonly RETRY_DELAY = 1000;
 
+  /**
+   * Standard analysis — sends failed/relevant logs with type "normal".
+   * message is "azure build pipeline error" for failed/partial builds,
+   * "azure build pipeline improvement" for everything else.
+   */
   async analyze(
     serviceUrl: string,
     token: string,
-    logs: string
+    buildRunUrl: string,
+    buildStatus: BuildStatus
   ): Promise<string> {
-    const request: AnalyzeRequest = {
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert at analyzing Azure DevOps build logs. Provide concise, actionable analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide details.",
-        },
-        {
-          role: "user",
-          content: `Analyze these Azure DevOps build logs and identify issues:\n\n${logs}`,
-        },
-      ],
+    const message =
+      buildStatus === "failed" || buildStatus === "partiallySucceeded"
+        ? "azure build pipeline error"
+        : "azure build pipeline improvement";
+
+    const request: ChatRequest = {
+      message,
+      data: buildRunUrl,
+      role: "user",
+      type: "normal",
     };
 
     return this.sendRequest(serviceUrl, token, request);
   }
 
+  /**
+   * Super analysis — always sends full logs with type "super".
+   * message follows the same failed/improvement rule.
+   */
   async superAnalyze(
     serviceUrl: string,
     token: string,
-    logs: string,
-    repositories: RepositoryContext[]
+    buildRunUrl: string,
+    buildStatus: BuildStatus
   ): Promise<string> {
-    let repositoryContext = "";
-    for (const repository of repositories) {
-      repositoryContext += `\n\nRepository: ${repository.repositoryName}\nBranch: ${repository.branch}\nCommit: ${repository.commit}\nFiles:\n`;
-      for (const file of repository.files) {
-        repositoryContext += file.content
-          ? `\n--- ${file.path} ---\n${file.content}\n`
-          : `- ${file.path}\n`;
-      }
-    }
-    const request: SuperAnalyzeRequest = {
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert at analyzing Azure DevOps build logs with repository context. Provide comprehensive analysis in markdown format (60-80 lines max). First summarize the problem in 5-10 lines, then provide detailed analysis with code references.",
-        },
-        {
-          role: "user",
-          content: `Analyze these Azure DevOps build logs with repository context:\n\n# Build Logs\n${logs}\n\n# Repository Context${repositoryContext}`,
-        },
-      ],
+    const message =
+      buildStatus === "failed" || buildStatus === "partiallySucceeded"
+        ? "azure build pipeline error"
+        : "azure build pipeline improvement";
+
+    const request: ChatRequest = {
+      message,
+      data: buildRunUrl,
+      role: "user",
+      type: "super",
     };
 
     return this.sendRequest(serviceUrl, token, request);
@@ -67,7 +60,7 @@ export class AIService {
   private async sendRequest(
     serviceUrl: string,
     token: string,
-    payload: AnalyzeRequest | SuperAnalyzeRequest
+    payload: ChatRequest
   ): Promise<string> {
     this.validateServiceUrl(serviceUrl);
     let lastError: Error | null = null;
@@ -93,9 +86,7 @@ export class AIService {
         if (!response.ok) {
           const message = await response.text().catch(() => "");
           const error = new Error(
-            `AI service returned HTTP ${response.status}: ${
-              message || response.statusText
-            }`
+            `AI service returned HTTP ${response.status}: ${message || response.statusText}`
           ) as Error & { statusCode: number };
           error.statusCode = response.status;
           throw error;
@@ -103,9 +94,9 @@ export class AIService {
 
         const result = (await response.json()) as unknown;
         if (!this.isValidAIResponse(result)) {
-          throw new Error("AI service returned invalid OpenAI response format");
+          throw new Error("AI service returned an unexpected response format");
         }
-        return result.choices[0].message.content;
+        return result.response;
       } catch (error) {
         lastError = this.toRequestError(error);
         if (this.isNonRetryable(lastError) || attempt === this.MAX_RETRIES) {
@@ -140,18 +131,10 @@ export class AIService {
   }
 
   private isValidAIResponse(data: unknown): data is AIResponse {
-    if (!data || typeof data !== "object") {
-      return false;
-    }
-    const choices = (data as { choices?: unknown }).choices;
-    if (!Array.isArray(choices) || choices.length === 0) {
-      return false;
-    }
-    const message = (choices[0] as { message?: unknown }).message;
     return (
-      !!message &&
-      typeof message === "object" &&
-      typeof (message as { content?: unknown }).content === "string"
+      !!data &&
+      typeof data === "object" &&
+      typeof (data as { response?: unknown }).response === "string"
     );
   }
 
@@ -160,7 +143,7 @@ export class AIService {
     return (
       (statusCode !== undefined && statusCode >= 400 && statusCode < 500) ||
       error.message.includes("URL") ||
-      error.message.includes("invalid OpenAI response")
+      error.message.includes("unexpected response")
     );
   }
 

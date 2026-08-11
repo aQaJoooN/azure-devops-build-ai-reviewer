@@ -417,28 +417,21 @@ class AnalyzerTabController {
       }
 
       console.log("Getting build status...");
-      // Get build status to determine which logs to send
+      // Get build status to determine message text and which logs to send
       const buildStatus = await this.buildService.getBuildStatus(this.buildId);
       console.log("Build status:", buildStatus);
 
-      // Select focused failed-task logs or complete logs based on build status.
-      const logs = await this.buildService.getLogsForAnalysis(
-        this.buildId,
-        buildStatus
-      );
-
-      console.log("Logs retrieved, length:", logs.length);
-
-      if (!logs || logs.trim().length === 0) {
-        throw new Error("No build logs available for analysis");
-      }
+      // Build the run URL used as the `data` field in the AI request
+      const buildRunUrl = this.buildRunUrl(this.buildId);
+      console.log("Build run URL:", buildRunUrl);
 
       console.log("Calling AI service...");
       // Call AI service for analysis
       const analysisMarkdown = await this.aiService.analyze(
         settings.aiServiceUrl,
         settings.aiServiceToken,
-        logs
+        buildRunUrl,
+        buildStatus
       );
 
       console.log("Analysis received, length:", analysisMarkdown.length);
@@ -497,22 +490,18 @@ class AnalyzerTabController {
         throw new Error("Super Analyze is not enabled. Please update extension settings.");
       }
 
-      // Get full build logs
-      const logs = await this.buildService.getBuildLogs(this.buildId);
+      // Get build status for the message field
+      const buildStatus = await this.buildService.getBuildStatus(this.buildId);
 
-      if (!logs || logs.trim().length === 0) {
-        throw new Error("No build logs available for analysis");
-      }
-
-      // Get repository context
-      const repositoryContext = await this.buildService.getRepositoryContext(this.buildId);
+      // Build the run URL used as the `data` field in the AI request
+      const buildRunUrl = this.buildRunUrl(this.buildId);
 
       // Call AI service for super analysis
       const analysisMarkdown = await this.aiService.superAnalyze(
         settings.aiServiceUrl,
         settings.aiServiceToken,
-        logs,
-        [repositoryContext]
+        buildRunUrl,
+        buildStatus
       );
 
       // Create analysis result
@@ -639,6 +628,16 @@ class AnalyzerTabController {
       "Analysis is Off",
       false
     );
+  }
+
+  /**
+   * Build the Azure DevOps build run URL for the given build ID.
+   * This is sent as the `data` field in AI requests.
+   */
+  private buildRunUrl(buildId: number): string {
+    const host = SDK.getHost();
+    const origin = window.location.origin;
+    return `${origin}/tfs/${host.name}/${this.projectId}/_apis/build/builds/${buildId}`;
   }
 
   /**
