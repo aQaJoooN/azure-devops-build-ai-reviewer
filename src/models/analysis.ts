@@ -16,5 +16,6 @@ export interface ChatRequest {
 
 /** Response from the BFF AI endpoint. */
 export interface AIResponse {
-  response: string;
+  answer: string;
+  request_id?: string;
 }

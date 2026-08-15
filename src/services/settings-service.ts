@@ -116,12 +116,19 @@ export class SettingsService {
         : "";
     let storedToken = "";
     if (includeToken) {
-      const tokenDocument = await this.getDocument(
-        SettingsService.CREDENTIALS_COLLECTION,
-        this.getTokenId(projectId)
-      );
-      storedToken =
-        typeof tokenDocument?.token === "string" ? tokenDocument.token : legacyToken;
+      // Only fetch from $credentials if a token has been configured before,
+      // or if there is a legacy inline token to migrate. This avoids a
+      // predictable 404 on every analyze click when no token was ever saved.
+      const tokenConfigured =
+        !!settingsDocument.aiServiceTokenConfigured || !!legacyToken;
+      if (tokenConfigured) {
+        const tokenDocument = await this.getDocument(
+          SettingsService.CREDENTIALS_COLLECTION,
+          this.getTokenId(projectId)
+        );
+        storedToken =
+          typeof tokenDocument?.token === "string" ? tokenDocument.token : legacyToken;
+      }
     }
 
     return {

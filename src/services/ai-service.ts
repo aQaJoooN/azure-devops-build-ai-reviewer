@@ -96,7 +96,7 @@ export class AIService {
         if (!this.isValidAIResponse(result)) {
           throw new Error("AI service returned an unexpected response format");
         }
-        return result.response;
+        return result.answer;
       } catch (error) {
         lastError = this.toRequestError(error);
         if (this.isNonRetryable(lastError) || attempt === this.MAX_RETRIES) {
@@ -134,7 +134,7 @@ export class AIService {
     return (
       !!data &&
       typeof data === "object" &&
-      typeof (data as { response?: unknown }).response === "string"
+      typeof (data as { answer?: unknown }).answer === "string"
     );
   }
 

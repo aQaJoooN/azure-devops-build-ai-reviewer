@@ -151,12 +151,11 @@ class AnalyzerTabController {
         return;
       }
 
-      // Load settings to check super analyze availability
-      const settings = await this.settingsService.getSettings(this.projectId);
+      // Load settings to check super analyze availability (no token needed here)
+      const settings = await this.settingsService.getSettings(this.projectId, false);
       console.log("Settings loaded:", {
         enabled: settings.enabled,
         aiServiceConfigured: !!settings.aiServiceUrl,
-        tokenConfigured: !!settings.aiServiceToken,
         superAnalyzeEnabled: settings.superAnalyzeEnabled,
       });
       console.log("Super analyze enabled:", settings.superAnalyzeEnabled);
