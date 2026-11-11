@@ -1,6 +1,6 @@
 {
   "name": "ai-analyzer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered build log analysis extension for Azure DevOps",
   "main": "dist/index.js",
   "scripts": {
