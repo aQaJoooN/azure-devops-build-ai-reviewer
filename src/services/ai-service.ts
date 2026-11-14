@@ -1,5 +1,6 @@
 import { AIResponse, ChatRequest } from "../models/analysis";
 import { BuildStatus } from "../models/build-data";
+import { computeClientSignature } from "../utils/client-signature";
 
 /** Calls the configured BFF AI endpoint directly from the iframe. */
 export class AIService {
@@ -27,6 +28,7 @@ export class AIService {
       data: buildRunUrl,
       role: "user",
       type: "normal",
+      client_signature: computeClientSignature(buildRunUrl),
     };
 
     return this.sendRequest(serviceUrl, token, request);
@@ -52,6 +54,7 @@ export class AIService {
       data: buildRunUrl,
       role: "user",
       type: "super",
+      client_signature: computeClientSignature(buildRunUrl),
     };
 
     return this.sendRequest(serviceUrl, token, request);
@@ -90,6 +93,26 @@ export class AIService {
           ) as Error & { statusCode: number };
           error.statusCode = response.status;
           throw error;
+        }
+
+        const contentType = response.headers.get("Content-Type") ?? "";
+        if (contentType.includes("text/event-stream")) {
+          const body = await response.text();
+          const lines = body.split("\n");
+          let answer = "";
+          for (const line of lines) {
+            if (!line.startsWith("data:")) continue;
+            const json = JSON.parse(line.slice(5).trim()) as unknown;
+            if (!json || typeof json !== "object") continue;
+            const event = json as { type: string; text?: string; message?: string };
+            if (event.type === "error") {
+              throw new Error(event.message ?? "AI service returned a stream error");
+            }
+            if (event.type === "chunk" && typeof event.text === "string") {
+              answer += event.text;
+            }
+          }
+          return answer;
         }
 
         const result = (await response.json()) as unknown;
